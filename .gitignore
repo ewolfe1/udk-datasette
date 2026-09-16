@@ -1,0 +1,10 @@
+.DS_Store
+.idea/
+~$*
+/holding-folder
+__pycache__/
+.ipynb_checkpoints/
+/venv/
+*.db
+/zOld/
+*.jpg

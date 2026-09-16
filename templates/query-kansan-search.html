@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+
+{% block title %}Search — KU Student Newspaper Archive{% endblock %}
+{% block body_class %}search-results{% endblock %}
+
+{% block content %}
+{% set q         = request.args.get("q", "") %}
+{% set year_from = request.args.get("year_from", "") %}
+{% set year_to   = request.args.get("year_to", "") %}
+{% set source    = request.args.get("source", "") %}
+{% set paper_name = request.args.get("paper_name", "") %}
+{% set category = request.args.get("category", "") %}
+{% set subject = request.args.get("subject", "") %}
+{% set entity = request.args.get("entity", "") %}
+{% set sort      = request.args.get("sort", "relevance") %}
+{% set offset    = (request.args.get("offset", "0") or "0")|int %}
+{% set page_size = 50 %}
+{% set has_more  = rows|length >= page_size %}
+{% set filters_active = year_from or year_to or source or paper_name or category or subject or entity or (sort and sort != 'relevance') %}
+
+<form action="" method="get">
+  <div class="search-top">
+    <input type="search" name="q" value="{{ q }}"
+           placeholder="Search the archive..." autofocus>
+    <button type="submit" class="search-btn">Search</button>
+    <details class="search-tips">
+      <summary>Search tips</summary>
+      <ul>
+        <li>Quote phrases for exact matches: <code>"world war"</code></li>
+        <li>Words separated by spaces all must appear: <code>kansas football</code></li>
+        <li>Use <code>OR</code> for alternatives: <code>kansas OR jayhawks</code></li>
+        <li>Use <code>NOT</code> to exclude: <code>football NOT basketball</code></li>
+        <li>Find words near each other: <code>NEAR(rock chalk, 10)</code></li>
+        <li>Prefix match with <code>*</code>: <code>jayhawk*</code> (matches <em>jayhawks</em>, <em>jayhawker</em>)</li>
+      </ul>
+    </details>
+    {% if q and rows %}
+      <div class="view-toggle" role="group" aria-label="Result view">
+        <button type="button" class="toggle-btn active"
+                data-view="list" title="List view"
+                aria-label="List view" aria-pressed="true">☰</button>
+        <button type="button" class="toggle-btn"
+                data-view="grid" title="Grid view"
+                aria-label="Grid view" aria-pressed="false">⊞</button>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="search-layout">
+    <div class="search-main">
+      {% if not q %}
+      <div class="search-intro">
+        <p class="search-intro-lead">
+          Search articles, advertisements, and OCR page text across 140 years
+          of student journalism at KU, 1878–2017.
+        </p>
+        <p class="search-intro-eg">Try:
+          <a href="?q=rock+chalk">rock chalk</a>
+          <a href="?q=Wilt+Chamberlain">Wilt Chamberlain</a>
+          <a href="?q=Vietnam">Vietnam</a>
+          <a href="?q=homecoming">homecoming</a>
+        </p>
+      </div>
+      {% endif %}
+      {% if q %}
+        <div class="results-header">
+          <span class="result-count" id="result-count"
+                data-offset="{{ offset }}" data-shown="{{ rows|length }}">
+            {% if rows %}
+              Showing {{ offset + 1 }}–{{ offset + rows|length }}{% if has_more %}, more available{% endif %}
+            {% else %}
+              No results for <strong>{{ q }}</strong>
+            {% endif %}
+          </span>
+
+          {% if filters_active %}
+            <a class="clear-filters" href="?q={{ q|urlencode }}">✕ Clear filters</a>
+          {% endif %}
+
+          <label for="sort">Sort:</label>
+          <select id="sort" name="sort" onchange="this.form.submit()">
+            <option value="relevance"{% if sort == 'relevance' %} selected{% endif %}>Relevance</option>
+            <option value="date_desc"{% if sort == 'date_desc' %} selected{% endif %}>Date (newest)</option>
+            <option value="date_asc"{% if sort == 'date_asc' %} selected{% endif %}>Date (oldest)</option>
+            <option value="title"{% if sort == 'title' %} selected{% endif %}>Title (A–Z)</option>
+          </select>
+          {% if rows %}
+              <span class="result-actions">
+                <a class="result-action" target="_blank" rel="noopener"
+                   title="Open these results in the dashboard"
+                   href="/-/dashboards/kansan_explore?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 13 3-3 4 4 5-6"/></svg>
+                  Visualize
+                </a>
+                <a class="result-action" download="kansan_search.csv"
+                   title="Download these results as CSV"
+                   href="/kansan/search_export.csv?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&sort={{ sort|urlencode }}">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                  Export CSV
+                </a>
+              </span>
+              {% endif %}
+        </div>
+        <!-- <div class="filter-chips" id="filter-chips" aria-label="Active filters"></div> -->
+        {# Active-filter chips. Each links back to the current search minus its own
+         dimension; the year chip clears both bounds. #}
+        {%- set source_labels = {'item': 'Articles', 'ad': 'Ads', 'ocr_element': 'OCR text'} -%}
+        {%- set all_params = [('q', q), ('year_from', year_from), ('year_to', year_to),
+                              ('source', source), ('paper_name', paper_name),
+                              ('category', category), ('subject', subject),
+                              ('entity', entity), ('sort', sort)] -%}
+        {%- set chips = [] -%}
+        {%- if paper_name %}{% set _ = chips.append((['paper_name'], 'Paper', paper_name)) %}{% endif -%}
+        {%- if category   %}{% set _ = chips.append((['category'], 'Category', category)) %}{% endif -%}
+        {%- if subject    %}{% set _ = chips.append((['subject'], 'Subject', subject)) %}{% endif -%}
+        {%- if entity     %}{% set _ = chips.append((['entity'], 'Person / org', entity)) %}{% endif -%}
+        {%- if source     %}{% set _ = chips.append((['source'], 'Source', source_labels.get(source, source))) %}{% endif -%}
+        {%- if year_from or year_to %}{% set _ = chips.append((['year_from', 'year_to'], 'Year', (year_from or '…') ~ '–' ~ (year_to or '…'))) %}{% endif -%}
+        <div class="filter-chips" aria-label="Active filters">
+          {%- if not chips %}<span class="filter-chips-empty">No filters applied</span>{% endif -%}
+          {%- for keys, label, value in chips -%}
+            {%- set qs = [] -%}
+            {%- for k, v in all_params if v and k not in keys -%}
+              {%- set _ = qs.append(k ~ '=' ~ v|urlencode) -%}
+            {%- endfor %}
+            <a class="filter-chip" href="?{{ qs|join('&') }}"
+               title="{{ label }}: {{ value }}"
+               aria-label="Remove filter — {{ label }}: {{ value }}"><span class="filter-chip-label">{{ label }}:</span><span class="filter-chip-value">{{ value }}</span><span class="filter-chip-x" aria-hidden="true">×</span></a>
+          {%- endfor %}
+        </div>
+
+        {% if not rows %}
+          {# Empty state: every suggestion is a link that actually runs a
+             broader search, rather than advice the reader has to act on. #}
+          <div class="no-results">
+            <p class="no-results-lead">Try one of these instead:</p>
+            <ul class="no-results-tips">
+              {% if filters_active %}
+                <li><a href="?q={{ q|urlencode }}">Search <strong>{{ q }}</strong> again</a> - clear the filters</li>
+              {% endif %}
+              {% if '*' not in q %}
+                <li><a href="?q={{ (q ~ '*')|urlencode }}">Search <strong>{{ q }}*</strong></a>
+                    — try using wildcards to catch more results.</li>
+              {% endif %}
+              <li>Check the spelling or try a different word. There may be errors in the data.</li>
+            </ul>
+          </div>
+        {% endif %}
+      {% endif %}
+
+      {# Base query strings for one-click refinements on result cards: each
+         omits the dimension it will set, so clicking narrows the current
+         search rather than starting a new one. #}
+      {% set qs_not_source %}q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}{% endset %}
+      {% set qs_not_year %}q={{ q|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}{% endset %}
+      {% set qs_not_category %}q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}{% endset %}
+
+      <ul class="result-list view-list">
+        {% for row in rows %}
+          {# Thumbnail URL: full-page TN for items; existing crop URL for ads/OCR. #}
+          {% if row.source == 'item' %}
+            <!-- full res, 200px w
+            {% set thumb_url = 'https://digital.lib.ku.edu/iiif/2/' ~ row.pid ~ '~JP2/full/200,/0/default.jpg' %} -->
+            <!-- reduced res, 140px w
+            {% set thumb_url = 'https://digital.lib.ku.edu/iiif/2/' ~ row.pid ~ '~JP2/pct:0,0,100,30/140,/0/default.jpg' %} -->
+            {% set thumb_url = 'https://digital.lib.ku.edu/islandora/object/' ~ row.pid ~ '/datastream/TN/view' %}
+
+          {% else %}
+            {% set thumb_url = row.iiif_url %}
+          {% endif %}
+
+          {# Viewer destination — every card now opens in the viewer. #}
+          {% set viewer_url = '/static/viewer.html?pid=' ~ row.pid|urlencode ~ '&source=' ~ row.source ~ '&source_id=' ~ row.source_id %}
+          {% if row.iiif_url %}
+            {% set bbox = row.iiif_url.split('~JP2/')[1].split('/')[0] %}
+            {% set viewer_url = viewer_url ~ '&bbox=' ~ bbox %}
+          {% endif %}
+
+          <li class="result-card result-card-{{ row.source }}">
+            <a href="{{ viewer_url }}"
+               class="result-thumb{% if not thumb_url %} result-thumb-empty{% endif %}"
+               target="_blank" rel="noopener">
+              {% if thumb_url %}
+                <img src="{{ thumb_url }}" alt="" loading="lazy">
+              {% endif %}
+            </a>
+            <div class="result-body">
+              <div class="result-meta-line">
+                <a class="result-source result-refine"
+                   href="?{{ qs_not_source }}&source={{ row.source|urlencode }}"
+                   title="Show only {{ row.source|replace('_', ' ') }} results">{{ row.source|replace('_', ' ') }}</a>
+                {% if row.category %}
+                  <a class="result-category result-refine"
+                     href="?{{ qs_not_category }}&category={{ row.category|urlencode }}"
+                     title="Show only {{ row.category }}">{{ row.category }}</a>
+                {% endif %}
+                {% if row.year %}
+                  <a class="result-date result-refine"
+                     href="?{{ qs_not_year }}&year_from={{ row.year|urlencode }}&year_to={{ row.year|urlencode }}"
+                     title="Show only {{ row.year }}">{{ row.date or row.year }}</a>
+                {% else %}
+                  <span class="result-date">{{ row.date or '' }}</span>
+                {% endif %}
+              </div>
+              {% if row.source == 'ocr_element' %}
+                <p class="result-snippet">
+                  <a href="{{ viewer_url }}" target="_blank" rel="noopener">{{ row.match|safe }}</a>
+                </p>
+              {% else %}
+                <h3 class="result-title">
+                  <a href="{{ viewer_url }}" target="_blank" rel="noopener">
+                    {{ row.title or '(untitled)' }}
+                  </a>
+                </h3>
+                {% if row.match %}
+                  <p class="result-snippet">{{ row.match|safe }}</p>
+                {% endif %}
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {% if q and (offset > 0 or has_more) %}
+        <nav class="pagination">
+          {% if offset > 0 %}
+            <a href="?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}&offset={{ offset - page_size }}">← Previous</a>
+          {% else %}
+            <span class="disabled">← Previous</span>
+          {% endif %}
+          {% if has_more %}
+            <a href="?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}&offset={{ offset + page_size }}" id="page-next">Next →</a>
+          {% else %}
+            <span class="disabled">Next →</span>
+          {% endif %}
+        </nav>
+      {% endif %}
+    </div>
+
+    <aside class="search-sidebar">
+      <div class="filter-group">
+        <h3 class="filter-heading">Filters</h3>
+
+        <div class="filter-row">
+          <div class="filter-field">
+            <label for="year_from">From year</label>
+            <input type="number" id="year_from" name="year_from"
+                   value="{{ year_from }}" placeholder="1878">
+          </div>
+          <div class="filter-field">
+            <label for="year_to">To year</label>
+            <input type="number" id="year_to" name="year_to"
+                   value="{{ year_to }}" placeholder="2017">
+          </div>
+        </div>
+
+        <div class="filter-field">
+          <label for="source">Source</label>
+          <select id="source" name="source">
+            <option value="">All sources</option>
+            <option value="item"{% if source == 'item' %} selected{% endif %}>Articles</option>
+            <option value="ad"{% if source == 'ad' %} selected{% endif %}>Ads</option>
+            <option value="ocr_element"{% if source == 'ocr_element' %} selected{% endif %}>OCR text</option>
+          </select>
+        </div>
+      </div>
+
+      {# Faceted refiners — top values (clickable) + result-scoped autocomplete box.
+         Shown only when there's a query; populated by JS. #}
+    <details class="facet-group" id="facet-paper_name-group"{% if not q %} style="display:none"{% endif %}{% if paper_name %} open{% endif %}>
+     <summary class="filter-heading">
+       <span>Paper</span>
+     </summary>
+     <ul class="facet-top" id="facet-paper_name-top"></ul>
+     <input class="facet-all-input" type="text" id="paper_name" name="paper_name"
+            value="{{ paper_name }}" list="dl-paper_name"
+            placeholder="All papers…" autocomplete="off">
+     <datalist id="dl-paper_name"></datalist>
+   </details>
+
+   <details class="facet-group" id="facet-category-group"{% if not q %} style="display:none"{% endif %}{% if category %} open{% endif %}>
+     <summary class="filter-heading">
+       <span>Category</span>
+     </summary>
+     <ul class="facet-top" id="facet-category-top"></ul>
+     <input class="facet-all-input" type="text" id="category" name="category"
+            value="{{ category }}" list="dl-category"
+            placeholder="All categories…" autocomplete="off">
+     <datalist id="dl-category"></datalist>
+   </details>
+
+  <details class="facet-group" id="facet-subject-group"{% if not q %} style="display:none"{% endif %}{% if subject %} open{% endif %}>
+   <summary class="filter-heading">
+     <span>Subject</span>
+   </summary>
+   <ul class="facet-top" id="facet-subject-top"></ul>
+   <input class="facet-all-input" type="text" id="subject" name="subject"
+          value="{{ subject }}" list="dl-subject"
+          placeholder="All subjects…" autocomplete="off">
+   <datalist id="dl-subject"></datalist>
+ </details>
+
+ <details class="facet-group" id="facet-entity-group"{% if not q %} style="display:none"{% endif %}{% if entity %} open{% endif %}>
+  <summary class="filter-heading">
+    <span>Person / org</span>
+  </summary>
+  <ul class="facet-top" id="facet-entity-top"></ul>
+  <input class="facet-all-input" type="text" id="entity" name="entity"
+         value="{{ entity }}" list="dl-entity"
+         placeholder="All people / orgs…" autocomplete="off">
+  <datalist id="dl-entity"></datalist>
+</details>
+
+      <div class="filter-actions">
+        <button type="submit" class="sidebar-btn">Apply</button>
+      </div>
+    </aside>
+  </div>
+</form>
+
+<script>
+(function () {
+  // ---- List / grid view toggle ----
+  var list = document.querySelector('.result-list');
+  var btns = document.querySelectorAll('.toggle-btn');
+  if (list && btns.length) {
+    function setView(view) {
+      list.classList.remove('view-list', 'view-grid');
+      list.classList.add('view-' + view);
+      btns.forEach(function (b) {
+        var active = (b.dataset.view === view);
+        b.classList.toggle('active', active);
+        b.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      try { localStorage.setItem('kansan-view', view); } catch (e) {}
+    }
+    btns.forEach(function (btn) {
+      btn.addEventListener('click', function () { setView(this.dataset.view); });
+    });
+    try { if (localStorage.getItem('kansan-view') === 'grid') setView('grid'); } catch (e) {}
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div'); d.textContent = (s == null ? '' : s);
+    return d.innerHTML;
+  }
+
+  var params = new URLSearchParams(window.location.search);
+  if (!params.get('q')) return;   // nothing below runs without a query
+
+  // ---- Total result count (patched into the header) ----
+  (function () {
+    var countEl = document.getElementById('result-count');
+    if (!countEl) return;
+    var p = new URLSearchParams();
+    ['q', 'year_from', 'year_to', 'source', 'paper_name', 'category', 'subject', 'entity']
+      .forEach(function (k) { var v = params.get(k); if (v) p.set(k, v); });
+
+    fetch('/kansan/search_count.json?_shape=objects&' + p.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var total = data.rows[0].total;
+        if (total === 0) return;
+        var offset = parseInt(countEl.dataset.offset, 10);
+        var shown  = parseInt(countEl.dataset.shown, 10);
+        countEl.innerHTML = 'Showing ' + (offset + 1) + '–' + (offset + shown) +
+                            ' of <strong>' + total.toLocaleString() + '</strong>';
+
+        // The template can only guess at "more available" from a full page of
+        // rows, so a result set ending exactly on a page boundary offers a
+        // Next link to an empty page. Now that the real total is known, retire it.
+        var next = document.getElementById('page-next');
+        if (next && offset + shown >= total) {
+          var dead = document.createElement('span');
+          dead.className = 'disabled';
+          dead.textContent = next.textContent;
+          next.replaceWith(dead);
+        }
+      })
+      .catch(function () {});
+  })();
+
+  // ---- Facets: top values (clickable) + datalist (result-scoped suggestions) ----
+  var facetLoaded = {};
+
+  function loadFacet(dim, endpoint) {
+    if (facetLoaded[dim]) return;
+    facetLoaded[dim] = true;
+
+    var topEl = document.getElementById('facet-' + dim + '-top');
+    var dlEl  = document.getElementById('dl-' + dim);
+    if (!topEl) return;
+
+    var p = new URLSearchParams();
+    ['q', 'year_from', 'year_to', 'source', 'paper_name', 'category', 'subject', 'entity']
+      .forEach(function (k) {
+        if (k === dim) return;                 // exclude own dimension
+        var v = params.get(k);
+        if (v) p.set(k, v);
+      });
+
+    fetch(endpoint + '?_shape=objects&' + p.toString())
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var rows = data.rows || [];
+        var current = params.get(dim) || '';
+
+        // datalist: every value present in the current results, sorted A–Z
+        if (dlEl) {
+          dlEl.innerHTML = '';
+          rows.map(function (row) { return row.value; })
+            .sort(function (a, b) {
+              return String(a).toLowerCase().localeCompare(String(b).toLowerCase());
+            })
+            .forEach(function (value) {
+              var o = document.createElement('option');
+              o.value = value;
+              dlEl.appendChild(o);
+            });
+        }
+
+        // top values — render up to 10, show 5 with a toggle (B3.5); full label on hover (B3.6)
+        topEl.innerHTML = '';
+        topEl.classList.remove('collapsed');
+        rows.slice(0, 10).forEach(function (row) {
+          var value = String(row.value);
+          var isActive = (current === value);
+          var lp = new URLSearchParams(window.location.search);
+          if (isActive) lp.delete(dim); else lp.set(dim, value);
+          lp.delete('offset');
+          var a = document.createElement('a');
+          a.className = 'facet-item' + (isActive ? ' active' : '');
+          if (isActive) a.setAttribute('aria-current', 'true');
+          a.href = '?' + lp.toString();
+          a.title = value;                                   // B3.6 — full label on hover
+          a.innerHTML = '<span class="facet-label">' + escapeHtml(value) + '</span>' +
+                        '<span class="facet-count">' + row.count.toLocaleString() + '</span>';
+          var li = document.createElement('li');
+          li.appendChild(a);
+          topEl.appendChild(li);
+        });
+
+        // B3.5 — "Show more / fewer" toggle when there are more than 5 values
+        if (rows.length > 5) {
+          topEl.classList.add('collapsed');
+          var moreBtn = document.createElement('button');
+          moreBtn.type = 'button';
+          moreBtn.className = 'facet-more';
+          moreBtn.setAttribute('aria-expanded', 'false');
+          moreBtn.textContent = 'Show more';
+          moreBtn.addEventListener('click', function () {
+            var collapsed = topEl.classList.toggle('collapsed');
+            moreBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            moreBtn.textContent = collapsed ? 'Show more' : 'Show fewer';
+          });
+          topEl.insertAdjacentElement('afterend', moreBtn);
+        }
+      })
+      .catch(function () {});
+  }
+
+  // Facet queries are expensive, so fetch a dimension only when its panel is
+  // opened. Panels with an active filter render open, so those load immediately.
+  [['paper_name', '/kansan/search_facet_paper_name.json'],
+   ['category',   '/kansan/search_facet_category.json'],
+   ['subject',    '/kansan/search_facet_subject.json'],
+   ['entity',     '/kansan/search_facet_entity.json']
+  ].forEach(function (f) {
+    var dim = f[0], endpoint = f[1];
+    var group = document.getElementById('facet-' + dim + '-group');
+    if (!group) return;
+    if (group.open) loadFacet(dim, endpoint);
+    group.addEventListener('toggle', function () {
+      if (group.open) loadFacet(dim, endpoint);
+    });
+  });
+})();
+
+</script>
+
+
+<script>
+  document.querySelectorAll('.search-sidebar input, .search-sidebar select')
+    .forEach(function (el) {
+      el.addEventListener('change', function () { el.form.submit(); });
+    });
+</script>
+{% endblock %}

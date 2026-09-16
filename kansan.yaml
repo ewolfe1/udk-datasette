@@ -1,0 +1,1304 @@
+title: KU Student Newspaper Archive
+description: Full-text search across student newspapers published at the University of Kansas, 1878-2017.
+
+extra_js_urls:
+  - /static/links.js
+extra_css_urls:
+  - /static/custom.css
+
+plugins:
+  datasette-dashboards:
+
+    kansan:
+      title: The Kansan in Numbers
+      description: A century of student journalism at the University of Kansas.
+
+      layout:
+        - [intro,       intro,       intro,       intro]
+        - [header-scale,  header-scale, header-scale,   header-scale]
+        - [m-pages,     m-items,     m-ads,       m-words]
+        - [header-coverage, header-coverage,  header-coverage,  header-coverage]
+        - [masthead-timeline, masthead-timeline, masthead-timeline, masthead-timeline]
+        - [coverage,    coverage,    coverage,    coverage]
+        - [cadence,     cadence,     cadence,     cadence]
+        - [header-topics, header-topics,  header-topics,  header-topics]
+        - [categories,  categories,  categories,  categories]
+        - [topics-heatmap, topics-heatmap, topics-heatmap, topics-heatmap]
+        - [header-advertising, header-advertising,  header-advertising,  header-advertising]
+        - [ads-time,        ads-time,        ads-time,        ads-time]
+        - [content-vs-ads,  content-vs-ads,  content-vs-ads,  content-vs-ads]
+        - [top-ad-categories,  top-ad-categories,  ad-categories-time, ad-categories-time]
+        - [header-people, header-people,  header-people,  header-people]
+        - [top-entities,       top-entities,       top-advertisers,    top-advertisers]
+
+      _palette:
+        - &c_content "#0051ba"
+        - &c_ads     "#f2a900"
+        # 5 categorical hues, each distinct in both hue and lightness so the
+        # series stay separable (incl. for common colour-vision deficiencies).
+        - &c_topics  [*c_content, "#3f8478", "#b5503f", "#6a7f2e", "#5a6a86"]
+
+      charts:
+        intro:
+          library: markdown
+          display: |
+            ### About this dashboard
+            These visualizations summarize the full run of student newspapers at the
+            University of Kansas, 1878–2017. All figures are derived from
+            AI-generated metadata and machine OCR;
+            see [About](/about#ai-disclosure) for caveats.
+
+        header-scale:
+          library: markdown
+          display: |
+            ### The collection at a glance
+            *1878-2017 · 140 years*
+
+        header-coverage:
+          library: markdown
+          display: |
+            ### Coverage over time
+            *Which papers ran when, how often they published, and how much of
+            each is in the collection.*
+
+        header-topics:
+          library: markdown
+          display: |
+            ### What the paper covered
+            *A century of shifting editorial attention, by topic.*
+
+        header-advertising:
+          library: markdown
+          display: |
+            ### Advertising's footprint
+            *How much of the paper was advertising — and what it sold.*
+            *Share is counted in detected items and ads, not page area: a
+            full-page ad and a two-line brief each count once.*
+
+        header-people:
+          library: markdown
+          display: |
+            ### Who made the news
+            *The names and businesses that turn up most across the archive.*
+
+        m-pages:
+          title: Pages
+          db: kansan
+          query: SELECT printf('%.0fK', SUM(page_count) / 1e3) AS n FROM stats_by_year
+          library: metric
+          display:
+            field: n
+            suffix: ""
+
+        m-items:
+          title: Articles & Items
+          db: kansan
+          query: SELECT printf('%.1fM', SUM(item_count) / 1e6) as n FROM stats_by_year
+          library: metric
+          display:
+            field: n
+
+        m-ads:
+          title: Advertisements
+          db: kansan
+          query: SELECT printf('%.0fK', SUM(ad_count) / 1e3) AS n FROM stats_by_year
+          library: metric
+          display:
+            field: n
+
+        m-words:
+          title: Words of OCR text
+          db: kansan
+          query: SELECT printf('%.0fM', SUM(word_count) / 1e6) AS n FROM stats_by_year
+          library: metric
+          display:
+            field: n
+
+        content-vs-ads:
+          title: "Advertising's share of the paper, by year"
+          db: kansan
+          query: |
+            SELECT year, 1.0 * ad_count / (item_count + ad_count) AS ad_share
+            FROM stats_by_year
+            WHERE year IS NOT NULL AND (item_count + ad_count) > 0
+            ORDER BY year
+          library: vega-lite
+          display:
+            mark: { type: line, tooltip: true, color: *c_ads, strokeWidth: 2 }
+            encoding:
+              x: { field: year, type: quantitative, scale: { nice: false }, axis: { title: null, format: "d" } }
+              y: { field: ad_share, type: quantitative, axis: { title: "Ads as share of detected items", format: "%" } }
+
+        masthead-timeline:
+          title: "Which paper ran when"
+          db: kansan
+          query: |
+            SELECT paper_name,
+                   MIN(CAST(year AS INTEGER))     AS first_year,
+                   MAX(CAST(year AS INTEGER))     AS last_year,
+                   MAX(CAST(year AS INTEGER)) + 1 AS span_end,
+                   COUNT(*)                       AS pages
+            FROM pages
+            WHERE paper_name IS NOT NULL AND paper_name != ''
+              AND year IS NOT NULL AND year != ''
+            GROUP BY paper_name
+            ORDER BY first_year
+          library: vega-lite
+          display:
+            mark: { type: bar, cornerRadius: 2 }
+            encoding:
+              x:
+                field: first_year
+                type: quantitative
+                scale: { nice: false, zero: false }
+                axis: { title: null, format: "d" }
+              # span_end is last_year + 1 so a paper present in a single year
+              # still draws a visible one-year block instead of a zero-width bar.
+              x2: { field: span_end }
+              y:
+                field: paper_name
+                type: nominal
+                sort: { field: first_year, op: min, order: ascending }
+                axis: { title: null }
+              color:
+                field: pages
+                type: quantitative
+                scale: { scheme: blues }
+                legend: { title: "Pages" }
+              tooltip:
+                - { field: paper_name, type: nominal, title: "Paper" }
+                - { field: first_year, type: quantitative, format: "d", title: "First year" }
+                - { field: last_year,  type: quantitative, format: "d", title: "Last year" }
+                - { field: pages,      type: quantitative, title: "Pages" }
+
+        cadence:
+          title: "Issues published, by year"
+          db: kansan
+          query: |
+            SELECT CAST(year AS INTEGER) AS year,
+                   COUNT(DISTINCT date)  AS issues
+            FROM pages
+            WHERE year IS NOT NULL AND year != ''
+            GROUP BY year
+            ORDER BY year
+          library: vega-lite
+          display:
+            mark: { type: line, tooltip: true, color: *c_content, strokeWidth: 1.6 }
+            encoding:
+              x: { field: year, type: quantitative, scale: { nice: false }, axis: { title: null, format: "d" } }
+              y: { field: issues, type: quantitative, axis: { title: "Distinct issue dates" } }
+
+        coverage:
+          title: "Pages and words digitized, by year"
+          db: kansan
+          query: |
+            SELECT year, page_count AS pages, word_count AS words
+            FROM stats_by_year
+            WHERE year IS NOT NULL
+            ORDER BY year
+          library: vega-lite
+          display:
+            params:
+              - name: cmode
+                value: pages
+                bind: { input: radio, options: [pages, words],
+                        labels: ["Pages", "Words of OCR"], name: "Show: " }
+            layer:
+              - transform:
+                  - calculate: "cmode == 'words' ? datum.words : datum.pages"
+                    as: value
+                mark: { type: area, tooltip: true, color: *c_content, line: { color: *c_content }, fillOpacity: 0.4 }
+                encoding:
+                  x: { field: year, type: quantitative, scale: { nice: false }, axis: { title: null, format: "d" } }
+                  y:
+                    field: value
+                    type: quantitative
+                    axis: { title: { expr: "cmode == 'words' ? 'Words of OCR' : 'Pages'" } }
+              # ---- Milestones ----
+              # PLACEHOLDERS: national events with obvious campus impact, chosen
+              # because they're verifiable US history rather than claims about KU
+              # specifically. Swap for KU events (masthead changes, campus
+              # milestones) when you have them. The rule and text layers share one
+              # anchored list, so years are only edited in one place — keep both
+              # layers enabled together or the alias breaks.
+              - data:
+                  values: &milestones
+                    - { year: 1917, label: "U.S. enters WWI" }
+                    - { year: 1941, label: "U.S. enters WWII" }
+                    - { year: 1972, label: "Title IX" }
+                mark: { type: rule, color: "#971b2f", strokeDash: [4, 3] }
+                encoding: { x: { field: year, type: quantitative } }
+              - data:
+                  values: *milestones
+                mark: { type: text, angle: 270, align: left, dx: 4, dy: -3, fontSize: 10, color: "#971b2f" }
+                encoding:
+                  x: { field: year, type: quantitative }
+                  y: { value: 0 }
+                  text: { field: label }
+
+        categories:
+          title: "How the paper's coverage shifted (top topics, by year)"
+          db: kansan
+          query: |
+            WITH top_cats AS (
+              SELECT category
+              FROM stats_by_category
+              WHERE source = 'item' AND category IS NOT NULL AND category <> ''
+              ORDER BY count DESC
+              LIMIT 5
+            )
+            SELECT s.year, s.category,
+                   s.count,
+                   1.0 * s.count / y.item_count AS share
+            FROM stats_by_year_category s
+            JOIN top_cats t      ON s.category = t.category
+            JOIN stats_by_year y ON y.year     = s.year
+            WHERE s.source = 'item' AND y.item_count > 0
+            ORDER BY s.year, s.category
+          library: vega-lite
+          display:
+            params:
+              - name: mode
+                value: volume
+                bind:
+                  input: radio
+                  options: [volume, share]
+                  labels: ["Volume", "% of items"]
+                  name: "Show: "
+            transform:
+              - calculate: "mode == 'share' ? datum.share : datum.count"
+                as: value
+            mark: { type: line, tooltip: true, interpolate: monotone }
+            encoding:
+              x:
+                field: year
+                type: quantitative
+                axis: { title: null, format: "d" }
+                scale: { nice: false }
+              y:
+                field: value
+                type: quantitative
+                axis:
+                  title: { expr: "mode == 'share' ? '% of items' : 'Items'" }
+                  labelExpr: "mode == 'share' ? format(datum.value, '.0%') : format(datum.value, 'd')"
+              color:
+                field: category
+                type: nominal
+                scale:
+                  range: *c_topics
+                legend: { title: "Topic" }
+
+        topics-heatmap:
+          title: "Topic mix by decade"
+          db: kansan
+          query: |
+            WITH top_cats AS (
+              SELECT category FROM stats_by_category
+              WHERE source = 'item' AND category IS NOT NULL AND category <> ''
+              ORDER BY count DESC LIMIT 8
+            )
+            SELECT (s.year / 10) * 10 AS decade, s.category,
+                   SUM(s.count) AS items,
+                   1.0 * SUM(s.count) / d.item_count AS share
+            FROM stats_by_year_category s
+            JOIN top_cats t        ON s.category = t.category
+            JOIN stats_by_decade d ON d.decade   = (s.year / 10) * 10
+            WHERE s.source = 'item'
+            GROUP BY decade, s.category, d.item_count
+            ORDER BY decade, s.category
+          library: vega-lite
+          display:
+            params:
+              - name: hmode
+                value: share
+                bind:
+                  input: radio
+                  options: [share, count]
+                  labels: ["% of decade", "Count"]
+                  name: "Color by: "
+            transform:
+              - calculate: "hmode == 'share' ? datum.share : datum.items"
+                as: value
+            mark: { type: rect, tooltip: true }
+            encoding:
+              x: { field: decade,   type: ordinal, axis: { title: null, labelAngle: 0 } }
+              y: { field: category, type: nominal,  axis: { title: null },
+                   sort: { op: sum, field: items, order: descending } }
+              color:
+                field: value
+                type: quantitative
+                scale: { scheme: "blues" }
+                legend: { title: { expr: "hmode == 'share' ? '% of decade' : 'Items'" } }
+              tooltip:
+                - { field: category, type: nominal,      title: "Topic" }
+                - { field: decade,   type: ordinal,      title: "Decade" }
+                - { field: items,    type: quantitative, title: "Items",        format: "," }
+                - { field: share,    type: quantitative, title: "% of decade",  format: ".1%" }
+
+        ads-time:
+          title: Advertising volume, by year
+          db: kansan
+          query: |
+            SELECT year, ad_count AS ads
+            FROM stats_by_year
+            WHERE ad_count IS NOT NULL AND ad_count > 0
+            ORDER BY year
+          library: vega-lite
+          display:
+            mark: { type: area, tooltip: true, color: *c_ads, line: { color: *c_ads }, fillOpacity: 0.3 }
+            encoding:
+              x: { field: year, type: quantitative,
+                   axis: { title: null, format: "d" },
+                   scale: { nice: false } }
+              y: { field: ads,  type: quantitative,
+                   axis: { title: "Advertisements" } }
+
+        top-entities:
+          title: Most-mentioned people & organizations
+          db: kansan
+          query: |
+            SELECT name, count
+            FROM stats_top_entities
+            ORDER BY count DESC
+            LIMIT 20
+          library: vega-lite
+          display:
+            mark: { type: bar, tooltip: true, color: *c_content }
+            encoding:
+              y: { field: name, type: nominal, sort: { field: count, order: descending }, axis: { title: null } }
+              x: { field: count, type: quantitative,
+                   axis: { title: "Mentions" } }
+
+        top-advertisers:
+          title: Most frequent advertisers
+          db: kansan
+          query: |
+            SELECT advertiser, count
+            FROM stats_top_advertisers
+            WHERE advertiser NOT LIKE '%Kansan%'
+            ORDER BY count DESC
+            LIMIT 20
+          library: vega-lite
+          display:
+            mark: { type: bar, tooltip: true, color: *c_ads  }
+            encoding:
+              y: { field: advertiser, type: nominal, sort: "-x",
+                   axis: { title: null } }
+              x: { field: count,      type: quantitative,
+                   axis: { title: "Advertisements" } }
+
+        top-ad-categories:
+          title: Top advertising categories
+          db: kansan
+          query: |
+            SELECT category, count
+            FROM stats_by_category
+            WHERE source = 'ad' AND category IS NOT NULL AND category <> ''
+            ORDER BY count DESC
+            LIMIT 12
+          library: vega-lite
+          display:
+            mark: { type: bar, tooltip: true, color: *c_ads  }
+            encoding:
+              y: { field: category, type: nominal, sort: "-x",
+                   axis: { title: null } }
+              x: { field: count,    type: quantitative,
+                   axis: { title: "Advertisements" } }
+
+        ad-categories-time:
+          title: "How advertising shifted (top categories, by year)"
+          db: kansan
+          query: |
+            WITH top_ad_cats AS (
+              SELECT category
+              FROM stats_by_category
+              WHERE source = 'ad' AND category IS NOT NULL AND category <> ''
+              ORDER BY count DESC
+              LIMIT 5
+            )
+            SELECT s.year, s.category,
+                   s.count,
+                   1.0 * s.count / y.ad_count AS share
+            FROM stats_by_year_category s
+            JOIN top_ad_cats t   ON s.category = t.category
+            JOIN stats_by_year y ON y.year     = s.year
+            WHERE s.source = 'ad' AND y.ad_count > 0
+            ORDER BY s.year, s.category
+          library: vega-lite
+          display:
+            params:
+              - name: admode
+                value: volume
+                bind:
+                  input: radio
+                  options: [volume, share]
+                  labels: ["Count", "% of ads"]
+                  name: "Show: "
+            transform:
+              - calculate: "admode == 'share' ? datum.share : datum.count"
+                as: value
+            mark: { type: line, tooltip: true, interpolate: monotone }
+            encoding:
+              x:
+                field: year
+                type: quantitative
+                scale: { nice: false }
+                axis: { title: null, format: "d" }
+              y:
+                field: value
+                type: quantitative
+                axis:
+                  title: { expr: "admode == 'share' ? '% of ads' : 'Ads'" }
+                  labelExpr: "admode == 'share' ? format(datum.value, '.0%') : format(datum.value, 'd')"
+              color:
+                field: category
+                type: nominal
+                scale:
+                  range: *c_topics
+                legend: { title: "Ad category" }
+
+    kansan_explore:
+      title: Explore search results as data
+      description: A visual breakdown of your current search.
+      filters:
+        q:          { name: Search,     type: text }
+        year_from:  { name: From year,  type: number }
+        year_to:    { name: To year,    type: number }
+        source:     { name: Source,     type: text }
+        paper_name: { name: Paper,      type: text }
+        category:   { name: Category,   type: text }
+        subject:    { name: Subject,    type: text }
+        entity:     { name: Person/org, type: text }
+      layout:
+        - [search-readout,          search-summary]
+        - [search-header-when,         search-header-when]
+        - [search-usage-time,       search-usage-time]
+        - [search-header-who,          search-header-who]
+        - [search-top-entities,     search-top-subjects]
+        - [search-entity-types,     search-ocr-words]
+        - [search-header-shift,        search-header-shift]
+        - [search-category-heatmap, search-category-heatmap]
+        - [search-source-mix,       search-source-mix]
+
+      charts:
+
+        search-readout:
+          title: Current search
+          db: kansan
+          query: |
+            SELECT
+              'Current search visualized:'
+              [[ || '<br>Keywords: '   || :q ]]
+              [[ || '<br>Source: '     || :source ]]
+              [[ || '<br>Paper: '      || :paper_name ]]
+              [[ || '<br>Category: '   || :category ]]
+              [[ || '<br>Subject: '    || :subject ]]
+              [[ || '<br>Person/org: ' || :entity ]]
+              || '<br>Years: '
+                 || CASE WHEN :year_from = '' THEN '1878' ELSE :year_from END
+                 || '–'
+                 || CASE WHEN :year_to   = '' THEN '2017' ELSE :year_to   END
+            AS "info"
+          library: table
+          display: {}
+
+        search-summary:
+          title: Results
+          db: kansan
+          query: |
+            SELECT
+              COUNT(*) || ' result' || CASE WHEN COUNT(*) = 1 THEN '' ELSE 's' END
+              || CASE WHEN COUNT(*) > 0
+                      THEN '<br>From ' || MIN(date) || ' to ' || MAX(date)
+                      ELSE '' END
+              AS "info"
+            FROM search_index
+            WHERE year <> ''
+              [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+              [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+              [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+              [[ AND source = :source ]]
+              [[ AND paper_name = :paper_name ]]
+              [[ AND category = :category ]]
+              [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                   OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+              [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                   OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+          library: table
+          display: {}
+
+        search-header-when:
+          library: markdown
+          display: |
+            ### When your search appears
+            *How often it turns up across the archive, year by year.*
+
+        search-header-who:
+          library: markdown
+          display: |
+            ### Who and what it's about
+            *The people, organizations, topics, and words tied to your results.*
+
+        search-header-shift:
+          library: markdown
+          display: |
+            ### How it shifted over time
+            *Categories by decade, and the article–ad–OCR mix.*
+
+        search-usage-time:
+          title: Matches over time
+          db: kansan
+          query: |
+            WITH hits AS (
+              SELECT CAST(year AS INTEGER) AS year, COUNT(*) AS matches
+              FROM search_index
+              WHERE year <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND source = :source ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND category = :category ]]
+                [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                     OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+                [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                     OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+              GROUP BY year
+            )
+            SELECT y.year,
+                   COALESCE(h.matches, 0)                         AS matches,
+                   1000.0 * COALESCE(h.matches, 0) / y.page_count AS per_1k_pages
+            FROM stats_by_year y
+            LEFT JOIN hits h ON h.year = y.year
+            WHERE y.page_count > 0
+            ORDER BY y.year
+          library: vega-lite
+          display:
+            params:
+              - name: mode
+                value: per1k
+                bind: { input: radio, options: [per1k, raw],
+                        labels: ["Per 1,000 pages", "Raw count"], name: "Show: " }
+            transform:
+              - calculate: "mode == 'per1k' ? datum.per_1k_pages : datum.matches"
+                as: value
+            mark: { type: area, line: true, tooltip: true, color: *c_content, opacity: 0.85 }
+            encoding:
+              x: { field: year, type: quantitative, scale: { nice: false },
+                   axis: { title: null, format: "d" } }
+              y:
+                field: value
+                type: quantitative
+                axis:
+                  title: { expr: "mode == 'per1k' ? 'Matches per 1,000 pages' : 'Matches'" }
+                  labelExpr: "mode == 'per1k' ? format(datum.value, '.1f') : format(datum.value, 'd')"
+
+        search-top-entities:
+          title: Most-mentioned people & organizations
+          db: kansan
+          query: |
+            WITH matched AS (
+              SELECT source || ':' || source_id AS rk, named_entities, advertiser
+              FROM search_index
+              WHERE year <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND source = :source ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND category = :category ]]
+                [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                     OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+              LIMIT 10000
+            ),
+            vals AS (
+              SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities <> ''
+              UNION ALL
+              SELECT rk, advertiser           FROM matched WHERE advertiser     IS NOT NULL AND advertiser     <> ''
+            ),
+            split(rk, token, rest) AS (
+              SELECT rk, NULL, v || '|' FROM vals
+              UNION ALL
+              SELECT rk, trim(substr(rest, 1, instr(rest, '|') - 1)), substr(rest, instr(rest, '|') + 1)
+              FROM split WHERE rest <> ''
+            )
+            SELECT trim(CASE WHEN instr(token, '[') > 0
+                             THEN substr(token, 1, instr(token, '[') - 1)
+                             ELSE token END) AS entity,
+                   COUNT(DISTINCT rk) AS mentions
+            FROM split
+            WHERE token IS NOT NULL AND token <> ''
+            GROUP BY entity
+            ORDER BY mentions DESC, entity
+            LIMIT 20
+          library: vega-lite
+          display:
+            layer:
+              - mark: { type: bar, tooltip: true, color: *c_content }
+              - mark: { type: text, align: left, dx: 4, color: "#333333" }
+                encoding: { text: { field: mentions, type: quantitative } }
+            encoding:
+              y: { field: entity, type: nominal, sort: null, axis: { title: null } }
+              x: { field: mentions, type: quantitative, axis: null }
+
+        search-top-subjects:
+          title: Most-tagged topics
+          db: kansan
+          query: |
+            WITH matched AS (
+              SELECT source || ':' || source_id AS rk, subjects, keywords
+              FROM search_index
+              WHERE year <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND source = :source ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND category = :category ]]
+                [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                     OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+              LIMIT 10000
+            ),
+            vals AS (
+              SELECT rk, subjects AS v FROM matched WHERE subjects IS NOT NULL AND subjects <> ''
+              UNION ALL
+              SELECT rk, keywords      FROM matched WHERE keywords IS NOT NULL AND keywords <> ''
+            ),
+            split(rk, token, rest) AS (
+              SELECT rk, NULL, v || '|' FROM vals
+              UNION ALL
+              SELECT rk, trim(substr(rest, 1, instr(rest, '|') - 1)), substr(rest, instr(rest, '|') + 1)
+              FROM split WHERE rest <> ''
+            )
+            SELECT token AS subject, COUNT(DISTINCT rk) AS articles
+            FROM split
+            WHERE token IS NOT NULL AND token <> ''
+            GROUP BY token
+            ORDER BY articles DESC, subject
+            LIMIT 20
+          library: vega-lite
+          display:
+            layer:
+              - mark: { type: bar, tooltip: true, color: *c_content }
+              - mark: { type: text, align: left, dx: 4, color: "#333333" }
+                encoding: { text: { field: articles, type: quantitative } }
+            encoding:
+              y: { field: subject,  type: nominal, sort: null, axis: { title: null } }
+              x: { field: articles, type: quantitative, axis: null }
+
+        search-category-heatmap:
+          title: Categories by decade
+          db: kansan
+          query: |
+            WITH top_cats AS (
+              SELECT category FROM search_index
+              WHERE year <> '' AND category <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND source = :source ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                     OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+                [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                     OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+              GROUP BY category ORDER BY COUNT(*) DESC LIMIT 12
+            )
+            SELECT decade, category, COUNT(*) AS matches
+            FROM search_index
+            WHERE year <> '' AND decade <> '' AND category IN (SELECT category FROM top_cats)
+              [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+              [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+              [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+              [[ AND source = :source ]]
+              [[ AND paper_name = :paper_name ]]
+              [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                   OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+              [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                   OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+            GROUP BY decade, category
+            ORDER BY decade, category
+          library: vega-lite
+          display:
+            mark: { type: rect, tooltip: true }
+            encoding:
+              x: { field: decade,   type: ordinal, axis: { title: null, labelAngle: 0 } }
+              y: { field: category, type: nominal,
+                   sort: { field: matches, op: sum, order: descending }, axis: { title: null } }
+              color: { field: matches, type: quantitative,
+                       scale: { scheme: blues }, legend: { title: "Matches" } }
+
+        search-source-mix:
+          title: Source mix over time
+          db: kansan
+          query: |
+            WITH per_year AS (
+              SELECT CAST(year AS INTEGER) AS year, source, COUNT(*) AS n
+              FROM search_index
+              WHERE year <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND category = :category ]]
+                [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                     OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+                [[ AND ('|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                     OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%') ]]
+              GROUP BY year, source
+            ),
+            totals AS ( SELECT year, SUM(n) AS total FROM per_year GROUP BY year )
+            SELECT p.year, p.source, 1.0 * p.n / t.total AS share
+            FROM per_year p JOIN totals t ON p.year = t.year
+            ORDER BY p.year, p.source
+          library: vega-lite
+          display:
+            mark: { type: line, tooltip: true, interpolate: monotone, strokeWidth: 2 }
+            encoding:
+              x: { field: year,  type: quantitative, scale: { nice: false }, axis: { title: null, format: "d" } }
+              y: { field: share, type: quantitative, axis: { title: "Share of matches", format: "%" } }
+              color:
+                field: source
+                type: nominal
+                scale: { domain: [item, ad, ocr_element], range: [*c_content, *c_ads, "#5a6a86"] }
+                legend: { title: "Source" }
+
+        search-entity-types:
+          title: Entity types in your results
+          db: kansan
+          query: |
+            WITH matched AS (
+              SELECT named_entities AS v
+              FROM search_index
+              WHERE year <> '' AND named_entities IS NOT NULL AND named_entities <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND source = :source ]]
+                [[ AND paper_name = :paper_name ]]
+                [[ AND category = :category ]]
+                [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                     OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+              LIMIT 10000
+            ),
+            split(token, rest) AS (
+              SELECT NULL, v || '|' FROM matched
+              UNION ALL
+              SELECT trim(substr(rest, 1, instr(rest, '|') - 1)), substr(rest, instr(rest, '|') + 1)
+              FROM split WHERE rest <> ''
+            )
+            SELECT
+              trim(substr(token, instr(token, '[') + 1,
+                          instr(token, ']') - instr(token, '[') - 1)) AS entity_type,
+              COUNT(*) AS n
+            FROM split
+            WHERE token IS NOT NULL AND token LIKE '%[%]%'
+            GROUP BY entity_type
+            ORDER BY n DESC
+            LIMIT 15
+          library: vega-lite
+          display:
+            layer:
+              - mark: { type: bar, tooltip: true, color: *c_content }
+              - mark: { type: text, align: left, dx: 4, color: "#333333" }
+                encoding: { text: { field: n, type: quantitative } }
+            encoding:
+              y: { field: entity_type, type: nominal, sort: null, axis: { title: null } }
+              x: { field: n,           type: quantitative, axis: null }
+
+        search-ocr-words:
+          title: Most frequent words in OCR snippets
+          db: kansan
+          query: |
+            WITH qterms(rest, term) AS (
+              SELECT lower(:q) || ' ', NULL
+              UNION ALL
+              SELECT substr(rest, instr(rest, ' ') + 1),
+                     trim(substr(rest, 1, instr(rest, ' ') - 1), '.,;:!?"''()[]{}<>-—–_*/\|')
+              FROM qterms WHERE rest <> ''
+            ),
+            matched AS (
+              SELECT title AS line
+              FROM search_index
+              WHERE source = 'ocr_element' AND title IS NOT NULL AND title <> ''
+                [[ AND search_index MATCH replace(:q, char(39), ' ') ]]
+                [[ AND CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER) ]]
+                [[ AND CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER) ]]
+                [[ AND paper_name = :paper_name ]]
+              LIMIT 5000
+            ),
+            words(rest, word) AS (
+              SELECT line || ' ', NULL FROM matched
+              UNION ALL
+              SELECT substr(rest, instr(rest, ' ') + 1),
+                     lower(trim(substr(rest, 1, instr(rest, ' ') - 1),
+                                '.,;:!?"''()[]{}<>-—–_*/\|'))
+              FROM words WHERE rest <> ''
+            )
+            SELECT word, COUNT(*) AS n
+            FROM words
+            WHERE word IS NOT NULL AND length(word) >= 4
+              AND word NOT IN (SELECT term FROM qterms WHERE term IS NOT NULL AND term <> '')
+              AND word NOT IN (
+                'the','and','for','that','with','was','are','his','her','from','this',
+                'have','not','but','you','all','they','were','had','has','will','can',
+                'out','who','about','their','said','would','there','been','which','when',
+                'what','into','than','them','then','some','more','only','over','also'
+              )
+            GROUP BY word
+            ORDER BY n DESC
+            LIMIT 25
+          library: vega-lite
+          display:
+            layer:
+              - mark: { type: bar, tooltip: true, color: "#5a6a86" }
+              - mark: { type: text, align: left, dx: 4, color: "#333333" }
+                encoding: { text: { field: n, type: quantitative } }
+            encoding:
+              y: { field: word, type: nominal, sort: null, axis: { title: null } }
+              x: { field: n,    type: quantitative, axis: null }
+
+databases:
+  kansan:
+    title: KU Student Newspaper Archive
+    source: KU Libraries Digital Collections
+    source_url: https://digital.lib.ku.edu/ku-udk/root
+    about: About this data
+    about_url: /about
+    # license: <your call — e.g. CC BY 4.0 — or omit and point to KU Libraries via 'about'>
+    # license_url: <url>
+    description_html: |
+      The open dataset behind the archive — every article, advertisement, and page of
+      OCR text, queryable directly. Browse the tables below, run your own SQL, or start
+      from one of the ready-made queries. Anything here can be downloaded as CSV or JSON.
+      <a href="/kansan/search">Search the archive</a> &middot;
+      <a href="/about#ai-disclosure">How this data was made</a>
+    tables:
+      pages:
+        label_column: pid
+        description_html: >
+          One scanned newspaper page per row (~190,000 pages). The pid links each page to
+          its full image in KU Libraries' digital collections.
+      items:
+        label_column: title
+        description: >
+          Articles, photographs, and other text blocks detected on each page, each with an
+          AI-generated title, summary, subjects, and named entities.
+          The subjects and named_entities columns hold several values separated by
+          a pipe (|); entities are commonly written as "Name [type]".
+          Join to a page image with pid, e.g. https://digital.lib.ku.edu/iiif/2/{pid}~JP2
+      ads:
+        label_column: advertiser
+        description: >
+          Advertisements detected on each page, with AI-generated descriptions and, where a
+          street address was found, coordinates for the advertisers map.
+          The keywords column holds several values separated by a pipe (|).
+          geo_status records whether an address was found and geocoded.
+
+      v_item_subjects:
+        description: One row per article-subject pairing. Facet on subject to find every article on a topic.
+        facets: [subject, category, year]
+        sort_desc: year
+      v_item_entities:
+        description: One row per article-entity pairing — people and organizations mentioned in articles.
+        facets: [entity_type, category, year]   # uncomment once you confirm these column names on the view
+      v_ad_keywords:
+        description: One row per advertisement-keyword pairing.
+        facets: [category, year]                # uncomment once you confirm these column names on the view
+      search_index:                   { hidden: true }
+      ocr_elements:                   { hidden: true }
+      page_ocr:                       { hidden: true }
+      item_subjects:                  { hidden: true }
+      item_entities:                  { hidden: true }
+      ad_keywords:                    { hidden: true }
+      sqlite_sequence:                { hidden: true }
+      stats_by_category:              { hidden: true }
+      stats_by_decade:                { hidden: true }
+      stats_by_year:                  { hidden: true }
+      stats_by_year_category:         { hidden: true }
+      stats_pages_per_issue_by_year:  { hidden: true }
+      stats_top_advertisers:          { hidden: true }
+      stats_top_entities:             { hidden: true }
+
+    queries:
+      search:
+        title: Search the KU Student Newspaper archive
+        description: Full-text search across the archive.
+        sql: |
+          SELECT
+            REPLACE(
+              CASE
+                WHEN snippet(search_index, 1, '<mark>', '</mark>', '…', 15) LIKE '%<mark>%'
+                     THEN snippet(search_index, 1, '<mark>', '</mark>', '…', 15)
+                ELSE snippet(search_index, -1, '<mark>', '</mark>', '…', 15)
+              END,
+              '|', ', '
+            ) AS match,
+            source, source_id, date, year, decade, pid,
+            page_url, iiif_url, category, title,
+            bm25(search_index) AS rank
+          FROM search_index
+          WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            AND (:source    = '' OR source   = :source)
+            AND (:paper_name = '' OR paper_name = :paper_name)
+            AND (:category  = '' OR category = :category)
+            AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                 OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                 OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+          ORDER BY
+            CASE WHEN :sort = 'date_asc'  THEN date END ASC,
+            CASE WHEN :sort = 'date_desc' THEN date END DESC,
+            CASE WHEN :sort = 'title'     THEN title END ASC,
+            CASE WHEN :sort = '' OR :sort = 'relevance' THEN bm25(search_index) END ASC
+          LIMIT 50 OFFSET CAST(:offset AS INTEGER)
+        params: [q, year_from, year_to, source, paper_name, category, subject, entity, sort, offset]
+      search_count:
+        title: Search result count
+        hide_sql: true
+        sql: |
+          SELECT COUNT(*) AS total
+          FROM search_index
+          WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            AND (:source    = '' OR source   = :source)
+            AND (:paper_name = '' OR paper_name = :paper_name)
+            AND (:category  = '' OR category = :category)
+            AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                 OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                 OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+        params: [q, year_from, year_to, source, paper_name, category, subject, entity]
+
+      search_facet_category:
+        title: Category facet counts
+        hide_sql: true
+        sql: |
+          SELECT category AS value, COUNT(*) AS count
+          FROM search_index
+          WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+            AND category IS NOT NULL AND category != ''
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            AND (:source    = '' OR source   = :source)
+            AND (:paper_name = '' OR paper_name = :paper_name)
+            AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                 OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                 OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+          GROUP BY category
+          ORDER BY count DESC, value
+          LIMIT 200
+        params: [q, year_from, year_to, source, paper_name, subject, entity]
+
+      search_facet_subject:
+        title: Subject facet counts
+        hide_sql: true
+        sql: |
+          WITH matched AS (
+            SELECT source || ':' || source_id AS rk, subjects, keywords
+            FROM search_index
+            WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+              AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+              AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+              AND (:source    = '' OR source   = :source)
+              AND (:paper_name = '' OR paper_name = :paper_name)
+              AND (:category  = '' OR category = :category)
+              AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                   OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+            LIMIT 10000           -- safety cap: facet samples up to 10k matches
+          ),
+          vals AS (
+            SELECT rk, subjects AS v FROM matched WHERE subjects IS NOT NULL AND subjects != ''
+            UNION ALL
+            SELECT rk, keywords      FROM matched WHERE keywords  IS NOT NULL AND keywords  != ''
+          ),
+          split(rk, token, rest) AS (
+            SELECT rk, NULL, v || '|' FROM vals
+            UNION ALL
+            SELECT rk, trim(substr(rest, 1, instr(rest, '|') - 1)),
+                       substr(rest, instr(rest, '|') + 1)
+            FROM split WHERE rest != ''
+          )
+          SELECT token AS value, COUNT(DISTINCT rk) AS count
+          FROM split
+          WHERE token IS NOT NULL AND token != ''
+          GROUP BY token
+          ORDER BY count DESC, value
+          LIMIT 200
+        params: [q, year_from, year_to, source, paper_name, category, entity]
+
+      search_facet_entity:
+        title: Entity facet counts
+        hide_sql: true
+        sql: |
+          WITH matched AS (
+            SELECT source || ':' || source_id AS rk, named_entities, advertiser
+            FROM search_index
+            WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+              AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+              AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+              AND (:source    = '' OR source   = :source)
+              AND (:paper_name = '' OR paper_name = :paper_name)
+              AND (:category  = '' OR category = :category)
+              AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                   OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            LIMIT 10000
+          ),
+          vals AS (
+            SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities != ''
+            UNION ALL
+            SELECT rk, advertiser           FROM matched WHERE advertiser     IS NOT NULL AND advertiser     != ''
+          ),
+          split(rk, token, rest) AS (
+            SELECT rk, NULL, v || '|' FROM vals
+            UNION ALL
+            SELECT rk, trim(substr(rest, 1, instr(rest, '|') - 1)),
+                       substr(rest, instr(rest, '|') + 1)
+            FROM split WHERE rest != ''
+          )
+          SELECT token AS value, COUNT(DISTINCT rk) AS count
+          FROM split
+          WHERE token IS NOT NULL AND token != ''
+          GROUP BY token
+          ORDER BY count DESC, value
+          LIMIT 200
+        params: [q, year_from, year_to, source, paper_name, category, subject]
+
+      search_facet_paper_name:
+        title: Paper-name facet counts
+        hide_sql: true
+        sql: |
+          SELECT paper_name AS value, COUNT(*) AS count
+          FROM search_index
+          WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+            AND paper_name IS NOT NULL AND paper_name != ''
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            AND (:source    = '' OR source   = :source)
+            AND (:category  = '' OR category = :category)
+            AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                 OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                 OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+          GROUP BY paper_name
+          ORDER BY count DESC, value
+          LIMIT 200
+        params: [q, year_from, year_to, source, category, subject, entity]
+      search_export:
+        title: Search export (CSV)
+        description: CSV export of search results.
+        hide_sql: true
+        sql: |
+          SELECT
+            title, date, year, source, source_id, category,
+            REPLACE(snippet(search_index, -1, '', '', '…', 15), '|', ', ') AS snippet,
+            page_url, iiif_url, pid
+          FROM search_index
+          WHERE :q != '' AND search_index MATCH replace(:q, char(39), ' ')
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            AND (:source    = '' OR source   = :source)
+            AND (:paper_name = '' OR paper_name = :paper_name)
+            AND (:category  = '' OR category = :category)
+            AND (:subject   = '' OR '|' || subjects || '|' LIKE '%|' || :subject || '|%'
+                                 OR '|' || keywords || '|' LIKE '%|' || :subject || '|%')
+            AND (:entity    = '' OR '|' || named_entities || '|' LIKE '%|' || :entity || '|%'
+                                 OR '|' || advertiser     || '|' LIKE '%|' || :entity || '|%')
+          ORDER BY
+            CASE WHEN :sort = 'date_asc'  THEN date END ASC,
+            CASE WHEN :sort = 'date_desc' THEN date END DESC,
+            CASE WHEN :sort = 'title'     THEN title END ASC,
+            CASE WHEN :sort = '' OR :sort = 'relevance' THEN bm25(search_index) END ASC
+          LIMIT 10000
+        params: [q, year_from, year_to, source, paper_name, category, subject, entity, sort]
+
+      # Pick the highest-PID page per year for a given MM-DD. In this collection
+      # the highest pid for a given date is reliably page 1 (95% of issues were
+      # bulk-ingested in that order).
+      pages_on_this_day:
+        title: Pages from this day across all years
+        description: "md: month-day in MM-DD format (e.g. 05-29)"
+        hide_sql: true
+        sql: |
+          WITH ranked AS (
+            SELECT pid, date, year, paper_name,
+                   ROW_NUMBER() OVER (PARTITION BY date ORDER BY pid DESC) AS rn
+            FROM pages
+            WHERE substr(date, 6) = :md
+          )
+          SELECT pid, date, year, paper_name
+          FROM ranked
+          WHERE rn = 1
+          ORDER BY year ASC
+        params: [md]
+
+      pages_by_date:
+        title: Browse pages by date
+        description: "date_prefix: a year (1995) or year-month (1995-02)."
+        sql: |
+          SELECT pid, date, year, paper_name, volume, number, page_url
+          FROM pages
+          WHERE date LIKE :date_prefix || '%'
+          ORDER BY date, pid
+          LIMIT 100
+        params: [date_prefix]
+
+      items_for_page:
+        title: All items on a page
+        description: "pid: a page identifier like ku-udk:101279."
+        sql: |
+          SELECT id, category, title, summary, subjects, named_entities, page_url
+          FROM items
+          WHERE pid = :pid
+          ORDER BY category, title
+        params: [pid]
+
+      ads_for_page:
+        title: All ads on a page
+        description: "pid: a page identifier like ku-udk:101279."
+        sql: |
+          SELECT id, advertiser, category, subcategory,
+                 summary, keywords, page_url, iiif_url
+          FROM ads
+          WHERE pid = :pid
+        params: [pid]
+
+      ocr_for_page:
+        title: All OCR text regions on a page
+        description: "pid: a page identifier like ku-udk:101279."
+        hide_sql: true
+        sql: |
+          SELECT id, text, iiif_url
+          FROM ocr_elements
+          WHERE pid = :pid AND iiif_url IS NOT NULL
+          ORDER BY id
+        params: [pid]
+
+      ads_geo_locations:
+        title: Ad locations for the map
+        description: One row per location (the pins), with a frequency-ordered advertiser list. Honours the filters.
+        sql: |
+          SELECT lat, lon,
+                 MIN(ma)                                                AS matched_address,
+                 SUM(n)                                                 AS n_ads,
+                 SUM(CASE WHEN advertiser IS NOT NULL THEN 1 ELSE 0 END) AS n_adv,
+                 group_concat(CASE WHEN advertiser IS NOT NULL THEN advertiser END, '||') AS advertisers
+          FROM (
+            SELECT lat, lon, advertiser,
+                   MIN(matched_address) AS ma,
+                   COUNT(*)             AS n
+            FROM ads
+            WHERE geo_status = 'show' AND lat IS NOT NULL
+              AND (:q = '' OR advertiser LIKE '%' || :q || '%'
+                           OR summary    LIKE '%' || :q || '%'
+                           OR keywords   LIKE '%' || :q || '%')
+              AND (:category    = '' OR category    = :category)
+              AND (:subcategory = '' OR subcategory = :subcategory)
+              AND (subcategory IS NULL OR subcategory != 'rentals')
+              AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+              AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+            GROUP BY lat, lon, advertiser
+            ORDER BY n DESC
+          )
+          GROUP BY lat, lon
+        params: [q, category, subcategory, year_from, year_to]
+
+      ads_at_location:
+        title: Ads at a single map location
+        description: All matching ads at one lat/lon, for the map's detail panel.
+        sql: |
+          SELECT id, pid, year, advertiser, category, subcategory,
+                 summary, keywords, iiif_url
+          FROM ads
+          WHERE geo_status = 'show'
+            AND lat = CAST(:lat AS REAL) AND lon = CAST(:lon AS REAL)
+            AND (:q = '' OR advertiser LIKE '%' || :q || '%'
+                         OR summary    LIKE '%' || :q || '%'
+                         OR keywords   LIKE '%' || :q || '%')
+            AND (:category    = '' OR category    = :category)
+            AND (:subcategory = '' OR subcategory = :subcategory)
+            AND (subcategory IS NULL OR subcategory != 'rentals')
+            AND (:year_from = '' OR CAST(year AS INTEGER) >= CAST(:year_from AS INTEGER))
+            AND (:year_to   = '' OR CAST(year AS INTEGER) <= CAST(:year_to   AS INTEGER))
+          ORDER BY year
+        params: [lat, lon, q, category, subcategory, year_from, year_to]
+
+      ads_geo_dims:
+        title: Category/subcategory options for the map filters
+        description: Distinct category + subcategory pairs among mappable ads.
+        sql: |
+          SELECT DISTINCT category, subcategory
+          FROM ads
+          WHERE geo_status = 'show' AND lat IS NOT NULL
+            AND category IS NOT NULL
+            AND (subcategory IS NULL OR subcategory != 'rentals')
+          ORDER BY category, subcategory
+
+      named_entity_search:
+        title: Find pages mentioning a person or organization
+        description: >
+          name: a person or organization (partial match works).
+          entity_type: leave blank for any, or filter to e.g. 'faculty', 'alumna'.
+        sql: |
+          SELECT DISTINCT i.pid, i.date, i.year, i.title,
+                 e.name AS entity, e.entity_type, i.page_url
+          FROM named_entities e
+          JOIN item_entities ie ON ie.entity_id = e.id
+          JOIN items i          ON i.id        = ie.item_id
+          WHERE e.name LIKE '%' || :name || '%'
+            AND (:entity_type = '' OR e.entity_type LIKE '%' || :entity_type || '%')
+          ORDER BY i.date
+          LIMIT 200
+        params: [name, entity_type]
+
+      subject_search:
+        title: Find articles by subject
+        description: "subject: a subject term (partial match works)."
+        sql: |
+          SELECT i.pid, i.date, i.year, i.category, i.title,
+                 s.name AS subject, i.page_url
+          FROM subjects s
+          JOIN item_subjects js ON js.subject_id = s.id
+          JOIN items i          ON i.id         = js.item_id
+          WHERE s.name LIKE '%' || :subject || '%'
+          ORDER BY i.date
+          LIMIT 200
+        params: [subject]
+
+      articles_by_category_and_year:
+        title: Articles by category, filtered by year range
+        description: "year_from / year_to: inclusive range (e.g. 1970 to 2000)."
+        sql: |
+          SELECT year, category, COUNT(*) as count
+          FROM items
+          WHERE year BETWEEN :year_from AND :year_to
+            AND category IS NOT NULL
+          GROUP BY year, category
+          ORDER BY year, count DESC
+        params: [year_from, year_to]
+
+      advertiser_history:
+        title: Find an advertiser across all years
+        description: "name: an advertiser name (partial match works)."
+        sql: |
+          SELECT advertiser, date, year, category, summary, page_url, iiif_url
+          FROM ads
+          WHERE advertiser LIKE '%' || :name || '%'
+          ORDER BY date
+        params: [name]
+
+      coverage_by_decade:
+        title: Collection coverage overview by decade
+        sql: |
+          SELECT decade,
+                 COUNT(DISTINCT pid) AS pages,
+                 MIN(date)           AS earliest,
+                 MAX(date)           AS latest
+          FROM pages
+          WHERE decade IS NOT NULL
+          GROUP BY decade
+          ORDER BY decade

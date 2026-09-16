@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block title %}Advertisers Map — KU Student Newspaper Archive{% endblock %}
+{% block body_class %}ad-map{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css">
+<style>
+  /* ── Ad map — inherits --kansan-* tokens and fonts from custom.css ── */
+  body.ad-map .content { max-width: none; padding: 0; }
+  .admap-header { display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      }
+  .admap-intro { padding: 1rem 1.5rem 0.5rem; }
+  .admap-intro h1 { margin: 0 0 0.2rem; font-family: var(--kansan-serif); font-weight: 400; }
+  .admap-intro p { margin: 0; color: var(--kansan-muted); font-size: 0.92rem; }
+
+  .about-map-container { position: relative; flex: 0 0 auto; padding: 0.6rem 1.1rem 0.8rem; }
+
+    /* Floating panel — mirrors .search-tips ul for site cohesion.
+       Only renders when [open], so the border appears only when expanded. */
+    .about-map-body {
+      position: absolute;
+      top: 100%;
+      right: 1.1rem;                     /* aligns with container padding */
+      margin-top: 0.3rem;
+      width: 24rem;                      /* (a) fixed width — no reflow on expand */
+      max-width: calc(100vw - 2rem);
+      padding: 0.9rem 1.1rem;
+      background: var(--kansan-surface);
+      border: 1px solid var(--kansan-border);   /* (c) light border when expanded */
+      border-radius: 4px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+      z-index: 1200;                     /* (b) floats above filter strip + map */
+    }
+    .about-map-body p { margin: 0 0 0.6rem; font-size: 0.78rem; line-height: 1.45; color: var(--kansan-text); }
+    .about-map-body p:first-child { margin-top: 0; }
+
+  .about-map > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    width: 100%;
+    margin-top: 0.7rem;
+    padding: 0.5rem 0.9rem;
+    font: inherit;
+    font-size: 0.88rem;
+    font-weight: 500;
+    cursor: pointer;
+    list-style: none;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  .about-map > summary:hover { background: var(--kansan-accent, #5a6a86); color: #fff; }
+  .about-map > summary::-webkit-details-marker { display: none; }
+  .about-map[open] > summary .vi-caret { transform: rotate(180deg); }
+
+  /* filter strip — reuses .filter-field control styling from custom.css */
+  .admap-filters {
+    display: flex; gap: 1rem 1.25rem; align-items: flex-end; flex-wrap: wrap;
+    padding: 0.85rem 1.5rem; border-bottom: 1px solid var(--kansan-border);
+    background: var(--kansan-surface);
+  }
+  .admap-filters .filter-field { display: flex; flex-direction: column; }
+  .admap-filters .filter-field label {
+    font-size: 0.78rem; color: var(--kansan-muted); margin-bottom: 0.2rem; white-space: nowrap;
+  }
+  .admap-filters input[type="text"], .admap-filters input[type="number"], .admap-filters select {
+    padding: 0.5rem 0.6rem; border: 1px solid var(--kansan-border); border-radius: 4px;
+    background: var(--kansan-bg); font: inherit; font-size: 0.95rem; box-sizing: border-box;
+    min-width: 11rem;
+  }
+  .admap-filters input[type="number"] { min-width: 7rem; -moz-appearance: textfield; }
+  .admap-filters input[type="number"]::-webkit-inner-spin-button,
+  .admap-filters input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .admap-filters input:focus, .admap-filters select:focus {
+    outline: none; border-color: var(--kansan-accent);
+    box-shadow: 0 0 0 3px rgba(1, 112, 255, 0.12);
+  }
+  .admap-reset {
+    padding: 0.5rem 0.8rem; background: var(--kansan-bg); color: var(--kansan-accent);
+    border: 1px solid var(--kansan-border); border-radius: 4px; font: inherit; font-size: 0.85rem;
+    cursor: pointer; margin: 0.85rem 0;
+  }
+  .admap-reset:hover { border-color: var(--kansan-accent); }
+  .admap-count { margin-left: auto; font-size: 0.85rem; color: var(--kansan-muted); align-self: center; }
+  .admap-count b { color: var(--kansan-text); }
+
+  .admap-stage { position: relative; height: 70vh; min-height: 420px; }
+  #admap { position: absolute; inset: 0; background: var(--kansan-bg); }
+  .leaflet-container { font-family: var(--kansan-sans); background: var(--kansan-bg); }
+
+  .pin {
+    width: 16px; height: 16px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    background: var(--kansan-accent); border: 1.5px solid var(--kansan-surface);
+    box-shadow: 0 2px 4px rgba(0,0,0,.35);
+  }
+  .marker-cluster { background: rgba(1, 112, 255, 0.18); }
+  .marker-cluster div {
+    background: var(--kansan-accent); color: #fff; font-family: var(--kansan-sans); font-weight: 600;
+  }
+
+  /* detail panel */
+  .admap-panel {
+    position: absolute; top: 0; right: 0; height: 100%; width: min(420px, 92vw);
+    background: var(--kansan-surface); border-left: 1px solid var(--kansan-border);
+    box-shadow: -8px 0 24px rgba(0,0,0,.12);
+    transform: translateX(102%); transition: transform .26s ease; z-index: 1000;
+    display: flex; flex-direction: column;
+  }
+  .admap-panel.open { transform: none; }
+  .admap-panel-head {
+    padding: 0.9rem 1rem 0.7rem; border-bottom: 2px solid var(--kansan-text);
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;
+  }
+  .admap-panel-head .where { font-family: var(--kansan-serif); font-size: 1.1rem; line-height: 1.2; }
+  .admap-panel-head .sub { font-size: 0.78rem; color: var(--kansan-muted); margin-top: 0.3rem; }
+  .admap-panel-close {
+    border: none; background: none; font-size: 1.5rem; line-height: 1; cursor: pointer;
+    color: var(--kansan-muted); padding: 0 0.2rem;
+  }
+  .admap-panel-close:hover { color: var(--kansan-accent); }
+  .admap-panel-body { overflow-y: auto; padding: 0.5rem 1rem 1.5rem; }
+
+  .adv-group { margin-top: 1rem; }
+  .adv-name {
+    font-family: var(--kansan-serif); font-size: 1rem; border-bottom: 1px solid var(--kansan-border);
+    padding-bottom: 0.2rem; margin-bottom: 0.5rem;
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .adv-name .n { font-size: 0.78rem; color: var(--kansan-muted); }
+
+  .ad-card { display: flex; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px dotted var(--kansan-border);
+        text-decoration: none; color: inherit; }
+  .ad-card:hover { background: var(--kansan-bg); }
+  .ad-card:last-child { border-bottom: none; }
+  .ad-clip {
+    flex: 0 0 76px; width: 76px; border: 1px solid var(--kansan-border);
+    background: var(--kansan-bg); overflow: hidden; align-self: flex-start;
+  }
+  .ad-clip img { width: 100%; display: block; }
+  .ad-clip.placeholder {
+    display: flex; align-items: center; justify-content: center; min-height: 64px;
+    background-image: radial-gradient(var(--kansan-border) 1px, transparent 1px); background-size: 5px 5px;
+  }
+  .ad-clip.placeholder span { font-size: 0.6rem; color: var(--kansan-muted); text-align: center; padding: 0.3rem; }
+  .ad-meta { flex: 1 1 auto; min-width: 0; }
+  .ad-meta .yr { font-weight: 700; font-size: 0.82rem; color: var(--kansan-accent); }
+  .ad-meta .cat { font-size: 0.68rem; color: var(--kansan-muted); margin-left: 0.4rem; }
+  .ad-meta .sum { font-size: 0.88rem; margin: 0.25rem 0 0.35rem; line-height: 1.35; }
+  .ad-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+  .ad-tag {
+    font-size: 0.65rem; color: var(--kansan-muted); border: 1px solid var(--kansan-border);
+    border-radius: 3px; padding: 0.05rem 0.3rem;
+  }
+  .ad-more { font-size: 0.85rem; margin-top: 0.5rem; }
+  .admap-empty { padding: 2rem 1rem; text-align: center; color: var(--kansan-muted); font-style: italic; }
+  .leaflet-tooltip .tip-advs { margin-top: 3px; font-weight: 400; color: var(--kansan-muted); }
+  .leaflet-tooltip .tip-advs > div { white-space: nowrap; }
+  .leaflet-tooltip .tip-more { font-style: italic; }
+  .admap-recenter {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px;                /* match the zoom buttons' footprint */
+    color: var(--kansan-text); background: var(--kansan-surface);
+    text-decoration: none; margin-top: 6px;   /* sit just beneath the zoom control */
+  }
+  .admap-recenter:hover { background: var(--kansan-bg); color: var(--kansan-accent); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="admap-header">
+<div class="admap-intro">
+  <h1>Advertisers, Mapped</h1>
+  <p>A selection of advertisers included in the data. Click a pin to browse detected ads.</p>
+</div>
+  <div class="about-map-container">
+  <details class="about-map">
+    <summary>What's represented on this map? <span class="vi-caret">▾</span></summary>
+    <div class="about-map-body">
+      <p><strong>What this map data includes.</strong><br/>
+        This map represents 46.8% of the advertisements included in the collection — over 23,000 advertisers.
+        Advertisements may be missing for a number of reasons, such as no address present in the ad,
+        imprecise address detection by the AI service, or issues georeferencing the supplied address.</p>
+      <p><strong>How were these addresses identified?</strong><br/>
+        Advertiser names and addresses were extracted by AI tools. Map locations were determined using
+        OpenStreetMap queries based on those extracted addresses.</p>
+      <p><strong>How reliable is this data?</strong><br/>
+        This map is provided as an overview and introductory search — it is not a substitute for the
+        actual printed data. Inaccurate, imprecise, or missing points may have been introduced through
+        AI address-detection errors, or because automated georeferencing returned no valid result.</p>
+      <a href="/about#ai-disclosure" target="_blank" rel="noopener">Learn more about how AI was used in this process</a>
+    </div>
+  </details>
+</div>
+</div>
+
+<div class="admap-filters">
+  <div class="filter-field">
+    <label for="admap-search">Keyword</label>
+    <input type="text" id="admap-search" placeholder="advertiser, summary, keyword…">
+  </div>
+  <div class="filter-field">
+    <label for="admap-cat">Category</label>
+    <select id="admap-cat"><option value="all">All categories</option></select>
+  </div>
+  <div class="filter-field">
+    <label for="admap-subcat">Subcategory</label>
+    <select id="admap-subcat"><option value="all">All</option></select>
+  </div>
+  <div class="filter-field">
+    <label for="admap-ymin">Year from</label>
+    <input type="number" id="admap-ymin" inputmode="numeric">
+  </div>
+  <div class="filter-field">
+    <label for="admap-ymax">Year to</label>
+    <input type="number" id="admap-ymax" inputmode="numeric">
+  </div>
+  <button class="admap-reset" id="admap-reset">Reset</button>
+  <div class="admap-count" id="admap-count">…</div>
+</div>
+
+<div class="admap-stage">
+  <div id="admap"></div>
+  <aside class="admap-panel" id="admap-panel">
+    <div class="admap-panel-head">
+      <div>
+        <div class="where" id="admap-panelWhere"></div>
+        <div class="sub" id="admap-panelSub"></div>
+      </div>
+      <button class="admap-panel-close" id="admap-panelClose" aria-label="Close">×</button>
+    </div>
+    <div class="admap-panel-body" id="admap-panelBody"></div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet/leaflet-maplibre-gl.js"></script>
+<script>
+/* ── CONFIG: "view all in the archive" link target (your ads table/query page) ── */
+const ARCHIVE_BASE = "/kansan/ads";          // <-- adjust to your ads table/query path
+function archiveUrl(ad){
+  const term = ad.advertiser || ad.matched_address || "";
+  return ARCHIVE_BASE + "?_search=" + encodeURIComponent(term);
+}
+const PANEL_CARD_CAP = 8;
+
+/* ── Map data comes from three canned queries (see kansan.yaml):
+     ads_geo_locations → one row per lat/lon (the pins), honouring the filters
+     ads_at_location   → the ads at one clicked location (the panel)
+     ads_geo_dims      → category/subcategory options for the filter menus
+   The full ~340k-row ad table is never shipped to the browser. ── */
+
+const map = L.map("admap", {zoomControl:true, maxZoom:19}).setView([38.966, -95.245], 14);
+
+// Single open, unrestricted basemap: OpenFreeMap's Positron — a clean light style with
+// street names and no business POIs, served as MapLibre vector tiles (crisp at every
+// zoom, no API key, no usage limits). Rendered into Leaflet via maplibre-gl-leaflet; the
+// markers/clusters/panel are normal Leaflet layers drawn on top of the vector canvas.
+L.maplibreGL({ style: "https://tiles.openfreemap.org/styles/positron" }).addTo(map);
+map.attributionControl.addAttribution(
+  '&copy; <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> ' +
+  '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors');
+
+const pinIcon = L.divIcon({className:"", html:'<div class="pin"></div>', iconSize:[16,16], iconAnchor:[8,15]});
+const cluster = L.markerClusterGroup({maxClusterRadius:45, showCoverageOnHover:false});
+map.addLayer(cluster);
+
+const $ = id => document.getElementById(id);
+
+// Escape data before it touches innerHTML / tooltips (OCR + LLM text is untrusted,
+// and advertiser names legitimately contain & ' " etc.).
+function esc(s){
+  return String(s ?? "").replace(/[&<>"']/g, c => (
+    {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
+  ));
+}
+function plural(n){ return n === 1 ? "" : "s"; }
+
+const els = {
+  search:$("admap-search"), cat:$("admap-cat"), subcat:$("admap-subcat"),
+  ymin:$("admap-ymin"), ymax:$("admap-ymax"),
+  count:$("admap-count"), reset:$("admap-reset"),
+  panel:$("admap-panel"), panelWhere:$("admap-panelWhere"), panelSub:$("admap-panelSub"),
+  panelBody:$("admap-panelBody"), panelClose:$("admap-panelClose"),
+};
+
+const HOME = {center:[38.966,-95.245], zoom:14};
+
+// ── Filters ──────────────────────────────────────────────────────────────────
+els.ymin.placeholder = "From (e.g. 1878)";   // archive span; matches the search page
+els.ymax.placeholder = "To (e.g. 2017)";
+
+// Open on a starting year span so the first view isn't overwhelming. This is a free
+// range (not a fixed decade), so spans like WWII work fine. Users can widen, narrow,
+// or clear it to see all years; Reset returns to this window. Set from/to to null to
+// open on the full archive instead.
+const DEFAULT_YEARS = { from: 1960, to: 1979 };   // ← adjust to taste
+function applyDefaultYears(){
+  els.ymin.value = DEFAULT_YEARS.from ?? "";
+  els.ymax.value = DEFAULT_YEARS.to   ?? "";
+}
+
+function yearBounds(){
+  // Read-only: never write back to the inputs (doing so mid-typing hijacks the cursor).
+  // Blank = unbounded. If inverted, query the intended span without touching the fields.
+  const a = els.ymin.value.trim()==="" ? null : parseInt(els.ymin.value,10);
+  const b = els.ymax.value.trim()==="" ? null : parseInt(els.ymax.value,10);
+  if(a!=null && b!=null && a>b) return [b,a];
+  return [a,b];
+}
+
+// The shared filter querystring sent to every map query.
+function filterParams(){
+  const [lo,hi]=yearBounds();
+  const p = new URLSearchParams();
+  p.set("q",           els.search.value.trim());
+  p.set("category",    els.cat.value==="all"    ? "" : els.cat.value);
+  p.set("subcategory", els.subcat.value==="all" ? "" : els.subcat.value);
+  p.set("year_from",   lo==null ? "" : lo);
+  p.set("year_to",     hi==null ? "" : hi);
+  return p;
+}
+
+// Category → [subcategories], built once from ads_geo_dims.
+const SUBCATS = new Map();
+function loadDims(){
+  fetch("/kansan/ads_geo_dims.json?_shape=array&_size=max")
+    .then(r=>r.json())
+    .then(rows=>{
+      rows.forEach(({category, subcategory})=>{
+        if(!category) return;
+        if(!SUBCATS.has(category)) SUBCATS.set(category, []);
+        if(subcategory) SUBCATS.get(category).push(subcategory);
+      });
+      [...SUBCATS.keys()].sort().forEach(c => els.cat.add(new Option(c, c)));
+    })
+    .catch(()=>{});
+}
+
+function refreshSubcats(){
+  const cat = els.cat.value;
+  els.subcat.innerHTML = '<option value="all">All</option>';
+  if(cat==="all" || !SUBCATS.has(cat)){ els.subcat.disabled=true; return; }
+  els.subcat.disabled=false;
+  [...new Set(SUBCATS.get(cat))].sort().forEach(s => els.subcat.add(new Option(s, s)));
+}
+
+// ── Pins ─────────────────────────────────────────────────────────────────────
+// Tooltip: the count line plus up to TIP_MAX_ADV advertiser names (most frequent
+// first), each capped at TIP_NAME_MAX chars. Names arrive as a '||'-joined string;
+// if the query doesn't supply them, the tooltip gracefully shows just the count line.
+const TIP_MAX_ADV = 5, TIP_NAME_MAX = 32;
+function locationTooltip(r){
+  const head = `<strong>${r.matched_address}</strong></br><hr/><strong>${r.n_ads} ad${plural(r.n_ads)} · ${r.n_adv} advertiser${plural(r.n_adv)}</strong>`;
+  const names = (r.advertisers || "").split("||").filter(Boolean);
+  if(!names.length) return head;
+  const lines = names.slice(0, TIP_MAX_ADV).map(n =>
+    `<div>${esc(n.length > TIP_NAME_MAX ? n.slice(0, TIP_NAME_MAX - 1) + "…" : n)}</div>`
+  ).join("");
+  const more = names.length > TIP_MAX_ADV
+    ? `<div class="tip-more">+ ${names.length - TIP_MAX_ADV} more</div>` : "";
+  return `${head}<div class="tip-advs">${lines}${more}</div>`;
+}
+
+function loadLocations(){
+  fetch("/kansan/ads_geo_locations.json?_shape=array&_size=max&" + filterParams())
+    .then(r=>r.json())
+    .then(rows=>{
+      cluster.clearLayers();
+      let totalAds = 0;
+      const markers = rows.map(r=>{
+        totalAds += r.n_ads;
+        const m = L.marker([r.lat, r.lon], {icon:pinIcon});
+        m.bindTooltip(locationTooltip(r), {direction:"top", offset:[0,-12]});
+        m.on("click", ()=>openPanel(r));
+        return m;
+      });
+      cluster.addLayers(markers);   // bulk add — much faster than addLayer in a loop
+      els.count.innerHTML =
+        `<b>${totalAds.toLocaleString()}</b> ads · <b>${rows.length.toLocaleString()}</b> locations`;
+    })
+    .catch(()=>{ els.count.textContent = "Could not load map data."; });
+}
+
+// ── Panel (ads at one clicked location) ────────────────────────────────────--
+function clip(ad){
+  if(ad.iiif_url) return `<div class="ad-clip"><img src="${esc(ad.iiif_url)}" alt="" loading="lazy"></div>`;
+  return `<div class="ad-clip placeholder"><span>ad clip<br>${esc(ad.year||"")}</span></div>`;
+}
+function tags(kw){
+  if(!kw) return "";
+  return `<div class="ad-tags">${kw.split("|").map(t=>`<span class="ad-tag">${esc(t)}</span>`).join("")}</div>`;
+}
+function bboxFromIiif(url){
+  try { return url.split("~JP2/")[1].split("/")[0]; } catch(e){ return ""; }
+}
+function viewerUrl(ad){
+  let u = "/static/viewer.html?pid=" + encodeURIComponent(ad.pid) +
+          "&source=ad&source_id=" + encodeURIComponent(ad.id);
+  const bbox = ad.iiif_url ? bboxFromIiif(ad.iiif_url) : "";
+  if(bbox) u += "&bbox=" + encodeURIComponent(bbox);
+  return u;
+}
+function adCard(ad){
+  const cat = esc(ad.category||"") + (ad.subcategory ? " · " + esc(ad.subcategory) : "");
+  return `<a class="ad-card" href="${esc(viewerUrl(ad))}" target="_blank" rel="noopener">${clip(ad)}<div class="ad-meta">
+    <span class="yr">${esc(ad.year??"—")}</span><span class="cat">${cat}</span>
+    <div class="sum">${esc(ad.summary||"")}</div>${tags(ad.keywords)}</div></a>`;
+}
+
+function renderPanel(loc, ads){
+  els.panelWhere.textContent = loc.matched_address || "Mapped location";
+  if(!ads.length){
+    els.panelSub.textContent = "";
+    els.panelBody.innerHTML = `<div class="admap-empty">No matching ads here.</div>`;
+    return;
+  }
+  const byAdv = new Map();
+  ads.forEach(a=>{ const n=a.advertiser||"Unattributed"; if(!byAdv.has(n)) byAdv.set(n,[]); byAdv.get(n).push(a); });
+  els.panelSub.textContent = `${ads.length} ad${plural(ads.length)} · ${byAdv.size} advertiser${plural(byAdv.size)}`;
+  let html="";
+  for(const [adv, group] of [...byAdv.entries()].sort((a,b)=>b[1].length-a[1].length)){
+    group.sort((a,b)=>(a.year||0)-(b.year||0));
+    const shown=group.slice(0,PANEL_CARD_CAP);
+    html+=`<div class="adv-group">
+      <div class="adv-name"><span>${esc(adv)}</span><span class="n">${group.length} ad${plural(group.length)}</span></div>
+      ${shown.map(adCard).join("")}
+      ${group.length>shown.length
+        ? `<div class="ad-more"><a href="${esc(archiveUrl(group[0]))}">+ ${group.length-shown.length} more — view all in the archive →</a></div>`
+        : `<div class="ad-more"><a href="${esc(archiveUrl(group[0]))}">View ${esc(adv)} in the archive →</a></div>`}
+    </div>`;
+  }
+  els.panelBody.innerHTML = html;
+}
+
+function openPanel(loc){
+  els.panelWhere.textContent = loc.matched_address || "Mapped location";
+  els.panelSub.textContent = "";
+  els.panelBody.innerHTML = `<div class="admap-empty">Loading…</div>`;
+  els.panel.classList.add("open");
+  const p = filterParams();
+  p.set("lat", loc.lat); p.set("lon", loc.lon);
+  fetch("/kansan/ads_at_location.json?_shape=array&_size=max&" + p)
+    .then(r=>r.json())
+    .then(ads=>renderPanel(loc, ads))
+    .catch(()=>{ els.panelBody.innerHTML = `<div class="admap-empty">Could not load ads.</div>`; });
+}
+function closePanel(){ els.panel.classList.remove("open"); }
+
+// ── Recenter: reset to the original Lawrence view ──────────────────────────--
+function recenter(){
+  map.setView(HOME.center, HOME.zoom);
+  closePanel();
+}
+const RecenterControl = L.Control.extend({
+  options:{position:"topleft"},
+  onAdd(){
+    const btn=L.DomUtil.create("a","leaflet-bar admap-recenter");
+    btn.href="#"; btn.title="Reset map view"; btn.setAttribute("role","button");
+    btn.setAttribute("aria-label","Reset the map to its starting view");
+    btn.innerHTML =
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="6"/>' +
+      '<line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/>' +
+      '<line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></svg>';
+    L.DomEvent.on(btn,"click",L.DomEvent.stop).on(btn,"click",recenter);
+    return btn;
+  }
+});
+map.addControl(new RecenterControl());
+
+// ── Wiring ─────────────────────────────────────────────────────────────────--
+let debounce;
+function debouncedReload(){ clearTimeout(debounce); debounce = setTimeout(loadLocations, 200); }
+
+els.search.addEventListener("input", debouncedReload);
+els.cat.addEventListener("change", ()=>{ refreshSubcats(); loadLocations(); });
+els.subcat.addEventListener("change", loadLocations);
+els.ymin.addEventListener("change", loadLocations);
+els.ymax.addEventListener("change", loadLocations);
+els.panelClose.addEventListener("click", closePanel);
+map.on("click", closePanel);
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closePanel(); });
+els.reset.addEventListener("click", ()=>{
+  els.search.value=""; els.cat.value="all"; refreshSubcats();
+  applyDefaultYears();
+  loadLocations(); recenter();
+});
+
+// ── Deep-link support: read a target pin + filters from the page URL ─────────
+// All optional. Params: lat, lon, z (zoom), q (keyword), year OR year_from/year_to.
+function applyUrlState(){
+  const u = new URLSearchParams(location.search);
+  let hasState = false;
+  if(u.has("q")){ els.search.value = u.get("q"); hasState = true; }
+  if(u.has("year") || u.has("year_from") || u.has("year_to")){
+    const y = u.get("year");
+    els.ymin.value = u.get("year_from") ?? y ?? "";   // override the default 1960–1979 window
+    els.ymax.value = u.get("year_to")   ?? y ?? "";   // so the target pin isn't filtered out
+    hasState = true;
+  }
+  const lat = parseFloat(u.get("lat")), lon = parseFloat(u.get("lon"));
+  if(!Number.isNaN(lat) && !Number.isNaN(lon)){
+    map.setView([lat, lon], u.has("z") ? parseInt(u.get("z"),10) : 18);
+    hasState = true;
+  }
+  return hasState;
+}
+
+// ── Go ──────────────────────────────────────────────────────────────────────
+refreshSubcats();
+if(!applyUrlState()) applyDefaultYears();   // URL state wins over the default window
+loadDims();
+loadLocations();
+</script>
+{% endblock %}

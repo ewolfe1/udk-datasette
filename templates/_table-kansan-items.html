@@ -1,0 +1,28 @@
+{# Rows-and-columns override for the items table: readable cards that link
+   into the viewer, reusing the search page's result-card styling. #}
+<div class="above-table-panel"></div>
+{% if display_rows %}
+<ul class="result-list view-list">
+  {% for row in display_rows %}
+    {% set pid = row["pid"] %}
+    {% set vurl = "/static/viewer.html?pid=" ~ (pid | urlencode) ~ "&source=item&source_id=" ~ row["id"] %}
+    <li class="result-card result-card-item">
+      <!-- <a href="{{ vurl }}" class="result-thumb{% if not pid %} result-thumb-empty{% endif %}" target="_blank" rel="noopener">
+        {% if pid %}<img src="https://digital.lib.ku.edu/iiif/2/{{ pid | urlencode }}~JP2/full/200,/0/default.jpg" alt="" loading="lazy">{% endif %}
+      </a> -->
+      <div class="result-body">
+        <div class="result-meta-line">
+          <span class="result-source">{{ row["category"] or "item" }}</span>
+          <span class="result-date">{{ row["date"] or "" }}</span>
+        </div>
+        <h3 class="result-title">
+          <a href="{{ vurl }}" target="_blank" rel="noopener">{{ row["title"] or "(untitled)" }}</a>
+        </h3>
+        {% if row["summary"] %}<p class="result-snippet">{{ row["summary"] }}</p>{% endif %}
+      </div>
+    </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="zero-results">0 records</p>
+{% endif %}

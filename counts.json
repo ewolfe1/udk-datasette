@@ -1,0 +1,81 @@
+{
+  "kansan": {
+    "hash": "d5df5130df427e206afaef00ba1c4665457a531a98d15a21f04d8b71e374d81b",
+    "size": 15885193216,
+    "file": "kansan.db",
+    "tables": {
+      "pages": {
+        "count": 188976
+      },
+      "items": {
+        "count": 1150997
+      },
+      "sqlite_sequence": {
+        "count": 5
+      },
+      "ads": {
+        "count": 743548
+      },
+      "page_ocr": {
+        "count": 188976
+      },
+      "ocr_elements": {
+        "count": 15152323
+      },
+      "subjects": {
+        "count": 177486
+      },
+      "item_subjects": {
+        "count": 2850331
+      },
+      "ad_keywords": {
+        "count": 2469227
+      },
+      "named_entities": {
+        "count": 608854
+      },
+      "item_entities": {
+        "count": 1086610
+      },
+      "search_index": {
+        "count": null
+      },
+      "search_index_data": {
+        "count": 444691
+      },
+      "search_index_idx": {
+        "count": 119315
+      },
+      "search_index_content": {
+        "count": 17046868
+      },
+      "search_index_docsize": {
+        "count": 17046868
+      },
+      "search_index_config": {
+        "count": 1
+      },
+      "stats_by_year": {
+        "count": 138
+      },
+      "stats_by_decade": {
+        "count": 15
+      },
+      "stats_by_category": {
+        "count": 126
+      },
+      "stats_by_year_category": {
+        "count": 6436
+      },
+      "stats_pages_per_issue_by_year": {
+        "count": 138
+      },
+      "stats_top_entities": {
+        "count": 200
+      },
+      "stats_top_advertisers": {
+        "count": 200
+      }
+    }
+  }
+}

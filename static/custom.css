@@ -1,0 +1,1654 @@
+/* KU Student Newspaper Archive — site-wide custom styles.
+   Loaded on every page via metadata.json (extra_css_urls). */
+
+/* ------------------------------------------------------------------
+   Hide noisy / internal columns from the HTML browse pages.
+
+   Datasette gives us two hooks to target specific cells:
+     - <body class="table table-<tablename>">   tells us which table
+     - <th class="col-<colname>">                tells us which column
+     - <td class="col-<colname>">                same for data cells
+
+   These rules ONLY affect the visual table; the columns still exist
+   in the database and are returned in JSON/CSV exports.
+   ------------------------------------------------------------------ */
+
+   /* ============================================================
+      Palette + typography
+      Change these variables to retheme the whole site.
+      ============================================================ */
+      :root {
+          --kansan-bg:           #f7f5f0;  /* warm cream — archival, not a KU brand color */
+          --kansan-surface:      #ffffff;
+          --kansan-text:         #333333;  /* KU Gray Text */
+          --kansan-muted:        #5a6a86;  /* KU Fog */
+          --kansan-border:       #d7d2cb;  /* KU Limestone */
+          --kansan-thumb:        #efece6;  /* placeholder behind loading thumbnails */
+          --kansan-accent:       #0051ba;  /* KU Kansas Blue  */
+          --kansan-accent-hover: #004091;  /* KU Kansas Blue Step 3 */
+
+          --kansan-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino,
+                          Georgia, 'Times New Roman', serif;
+          --kansan-sans:  -apple-system, BlinkMacSystemFont, 'Segoe UI',
+                          Roboto, sans-serif;
+      }
+
+
+   /* ============================================================
+      Site-wide tone
+      Gentle overrides — Datasette's own layout still does the work.
+      ============================================================ */
+   body {
+       background: var(--kansan-bg);
+       color: var(--kansan-text);
+       font-family: var(--kansan-sans);
+   }
+
+   h1, h2, h3 {
+       font-family: var(--kansan-serif);
+       color: var(--kansan-text);
+       letter-spacing: -0.01em;
+   }
+
+   a { color: var(--kansan-accent); }
+   a:hover { color: var(--kansan-accent-hover); }
+
+   /* ============================================================
+      Homepage (body.index)
+      ============================================================ */
+   body.index .content {
+       max-width: 95%;
+       margin: 0 auto;
+       padding: 4rem 1.5rem 2rem;
+   }
+
+   body.db-kansan .content {
+     max-width: 90%;
+     margin: 0 auto;
+     padding: 4rem 1.5rem 2rem;
+   }
+
+   body.index .hero, body.db-kansan .hero { text-align: center; }
+
+   body.db-kansan .hero { position: relative; width: 100%;}
+   body.db-kansan .hero::before {
+     content: "";
+     position: absolute;
+     right: 0;
+     top: 0;
+     background-image: url("/static/assets/data.png");
+     background-position: right;
+     background-repeat: no-repeat;
+     background-size:  contain;
+     opacity: 0.5;
+     height: 150px;
+     width: 150px;
+   }
+
+   body.index .hero h1, body.db-kansan .hero h1 {
+       font-size: 3rem;
+       font-weight: 400;
+       margin: 0 0 0.75rem;
+       line-height: 1.15;
+   }
+
+   body.index .lead, body.db-kansan .lead {
+       font-size: 1.15rem;
+       color: var(--kansan-muted);
+       margin: 0 0 2.5rem;
+   }
+
+   body.index .search-form {
+       display: flex;
+       max-width: 600px;
+       margin: 0 auto;
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+       background: var(--kansan-surface);
+       overflow: hidden;
+       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+   }
+
+   body.index .search-form:focus-within {
+       border-color: var(--kansan-accent);
+       box-shadow: 0 0 0 3px #7a2222;
+   }
+
+   body.index .search-form input[type="search"] {
+       flex: 1;
+       border: none;
+       padding: 0.9rem 1.2rem;
+       font-size: 1.05rem;
+       background: transparent;
+       font-family: inherit;
+   }
+
+   body.index .search-form input[type="search"]:focus { outline: none; }
+
+   body.index .search-form button {
+       border: none;
+       padding: 0 1.75rem;
+       background: var(--kansan-accent);
+       color: white;
+       font-size: 1rem;
+       font-family: inherit;
+       font-weight: 500;
+       cursor: pointer;
+   }
+
+   body.index .search-form button:hover {
+       background: var(--kansan-accent-hover);
+   }
+
+   body.index .examples {
+       text-align: center;
+       color: var(--kansan-muted);
+       font-size: 0.95rem;
+       margin-top: 1.5rem;
+   }
+
+   body.index .examples a {
+       color: var(--kansan-accent);
+       text-decoration: none;
+       margin: 0 0.4rem;
+       border-bottom: 1px solid transparent;
+   }
+
+   body.index .examples a:hover {
+       border-bottom-color: var(--kansan-accent);
+   }
+
+   body.index .stats {
+       text-align: center;
+       color: var(--kansan-muted);
+       font-size: 0.85rem;
+       letter-spacing: 0.05em;
+       text-transform: uppercase;
+       margin: 2rem auto 2rem;
+       padding-top: 2rem;
+       border-top: 1px solid var(--kansan-border);
+       max-width: 760px;
+   }
+
+/* pages: identifier (duplicates pid), section, page (label_column shows it),
+   confidence (AI extraction score) */
+body.table-pages th.col-identifier,
+body.table-pages td.col-identifier,
+body.table-pages th.col-section,
+body.table-pages td.col-section,
+body.table-pages th.col-page,
+body.table-pages td.col-page,
+body.table-pages th.col-confidence,
+body.table-pages td.col-confidence {
+    display: none;
+}
+
+/* items: confidence */
+body.table-items th.col-confidence,
+body.table-items td.col-confidence {
+    display: none;
+}
+
+/* ads: bbox coordinates (already encoded in iiif_url), confidence */
+body.table-ads th.col-x1,
+body.table-ads td.col-x1,
+body.table-ads th.col-y1,
+body.table-ads td.col-y1,
+body.table-ads th.col-x2,
+body.table-ads td.col-x2,
+body.table-ads th.col-y2,
+body.table-ads td.col-y2,
+body.table-ads th.col-confidence,
+body.table-ads td.col-confidence {
+    display: none;
+}
+
+/* #sql-query, .sql-editor, a[href*="?sql="] {
+    display: none;
+} */
+
+   /* ============================================================
+      Search results — layout
+      ============================================================ */
+
+   body.search-results .content {
+       max-width: 85%;
+       margin: 0 auto;
+       padding: 1.5rem 1.5rem 4rem;
+   }
+
+   /* Top bar: search input + submit + view toggle */
+   .search-top {
+       display: flex;
+       gap: 0.5rem;
+       align-items: center;
+       margin-bottom: 1.5rem;
+   }
+
+   .search-top input[type="search"] {
+       flex: 1;
+       padding: 0.75rem 1rem;
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+       background: var(--kansan-surface);
+       font: inherit;
+       font-size: 1.05rem;
+   }
+
+   .search-top input[type="search"]:focus {
+       outline: none;
+       border-color: var(--kansan-accent);
+       box-shadow: 0 0 0 3px #7a2222;
+   }
+
+   .search-top .search-btn {
+       padding: 0.75rem 1.4rem;
+       background: var(--kansan-accent);
+       color: white;
+       border: none;
+       border-radius: 4px;
+       font: inherit;
+       font-weight: 500;
+       cursor: pointer;
+   }
+
+   .search-top .search-btn:hover { background: var(--kansan-accent-hover); }
+
+   /* Two-column: sidebar + results */
+   .search-layout {
+       display: grid;
+       grid-template-columns: 1fr 260px;
+       gap: 2rem;
+       align-items: start;
+   }
+
+   /* sample searches for blank query */
+   .search-intro { padding: 2.5rem 0 1rem; max-width: 60ch; }
+    .search-intro-lead { font-size: 1.05rem; line-height: 1.6; color: var(--kansan-text); margin: 0 0 1rem; }
+    .search-intro-eg { color: var(--kansan-muted); font-size: 0.95rem; }
+    .search-intro-eg a {
+      display: inline-block; margin: 0 0.5rem 0.4rem 0; padding: 0.2rem 0.7rem;
+      border: 1px solid var(--kansan-border); border-radius: 999px;
+      background: var(--kansan-surface); color: var(--kansan-accent); text-decoration: none;
+    }
+    .search-intro-eg a:hover { border-color: var(--kansan-accent); background: var(--kansan-accent); color: #fff; }
+
+    .result-action {
+      display: inline-flex; align-items: center; gap: 0.35rem;
+      color: var(--kansan-accent); font-size: 0.85rem; font-weight: 500;
+      text-decoration: none; white-space: nowrap;
+    }
+    .result-action:hover { color: var(--kansan-accent-hover); text-decoration: underline; }
+    .result-action svg { width: 0.9rem; height: 0.9rem; flex-shrink: 0; }
+
+   /* ============================================================
+      Sidebar
+      ============================================================ */
+
+   .search-sidebar {
+       position: sticky;
+       top: 1.5rem;
+   }
+
+   /* Sidebar sticks and scrolls on its own, so you don't have to scroll
+   all the results before the facets move. Scoped to the wide layout so
+   it doesn't interfere when the sidebar stacks on mobile. */
+    @media (min-width: 768px) {
+        .search-sidebar {
+            position: sticky;
+            top: 1rem;
+            align-self: start;          /* don't stretch to the results' height */
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+    }
+
+   .filter-group {
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+       background: var(--kansan-surface);
+       padding: 1rem;
+       margin-bottom: 1rem;
+   }
+
+   .filter-heading {
+    font-family: var(--kansan-serif);
+    font-size: 1rem;
+    font-weight: 500;
+    margin: 0 0 0.75rem;
+    color: var(--kansan-text);
+    }
+
+    /* Year inputs side by side */
+    .filter-row {
+        display: flex;
+        gap: 0.6rem;
+        margin-bottom: 0.9rem;
+    }
+    .filter-row .filter-field {
+        flex: 1;
+        margin-bottom: 0;
+    }
+
+    .filter-field {
+        margin-bottom: 0.75rem;
+        position: relative;
+    }
+
+   .filter-field label {
+       display: block;
+       font-size: 0.85rem;
+       color: var(--kansan-muted);
+       margin-bottom: 0.2rem;
+       white-space: nowrap;
+   }
+
+   .filter-field input[type="number"],
+   .filter-field input[type="text"],
+   .filter-field select {
+       width: 100%;
+       padding: 0.5rem 0.6rem;
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+       background: var(--kansan-bg);
+       font: inherit;
+       font-size: 0.95rem;
+       box-sizing: border-box;
+   }
+
+   .filter-field input[type="number"] {
+       -moz-appearance: textfield;
+   }
+
+   .filter-field input[type="number"]::-webkit-inner-spin-button,
+   .filter-field input[type="number"]::-webkit-outer-spin-button {
+       -webkit-appearance: none;
+       margin: 0;
+   }
+
+   .filter-field input:focus,
+   .filter-field select:focus {
+       outline: none;
+       border-color: var(--kansan-accent);
+       box-shadow: 0 0 0 3px #7a2222;
+   }
+
+   .sidebar-btn {
+       width: 100%;
+       padding: 0.55rem;
+       background: var(--kansan-accent);
+       color: white;
+       border: none;
+       border-radius: 4px;
+       font: inherit;
+       font-weight: 500;
+       cursor: pointer;
+       margin-top: 0.25rem;
+   }
+
+   .sidebar-btn:hover { background: var(--kansan-accent-hover); }
+
+   .csv-link {
+       display: block;
+       text-align: center;
+       margin-top: 0.75rem;
+       padding: 0.45rem;
+       color: var(--kansan-muted);
+       text-decoration: none;
+       font-size: 0.85rem;
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+   }
+
+   .csv-link:hover {
+       color: var(--kansan-accent);
+       border-color: var(--kansan-accent);
+   }
+
+   /* ============================================================
+      View toggle
+      ============================================================ */
+
+   .view-toggle {
+       display: flex;
+       border: 1px solid var(--kansan-border);
+       border-radius: 4px;
+       overflow: hidden;
+       flex-shrink: 0;
+   }
+
+   .toggle-btn {
+       border: none;
+       background: var(--kansan-surface);
+       color: var(--kansan-muted);
+       padding: 0.5rem 0.65rem;
+       cursor: pointer;
+       font-size: 1rem;
+       line-height: 1;
+   }
+
+   .toggle-btn.active { background: var(--kansan-text); color: white; }
+   .toggle-btn:hover:not(.active) { background: var(--kansan-border); }
+
+   /* ============================================================
+      Results — shared
+      ============================================================ */
+
+   .result-list {
+       list-style: none;
+       padding: 0;
+       margin: 0;
+   }
+
+   .result-card {
+       display: flex;
+       gap: 1.25rem;
+       padding: 1.25rem 0;
+       border-bottom: 1px solid var(--kansan-border);
+   }
+
+   .result-card:last-child { border-bottom: none; }
+
+   .result-thumb {
+       flex: 0 0 140px;
+       background: #ece9e2;
+       border: 1px solid var(--kansan-border);
+       display: block;
+       overflow: hidden;
+       border-radius: 2px;
+       align-self: start;
+       max-height: 150px;
+       align-items: center;
+   }
+
+   .result-thumb img {
+       width: 100%;
+       height: auto;
+       display: block;
+   }
+
+   .result-thumb-empty {
+       min-height: 60px;
+       position: relative;
+   }
+
+   .result-thumb-empty::after {
+       content: '—';
+       position: absolute;
+       inset: 0;
+       display: flex;
+       align-items: center;
+       justify-content: center;
+       color: #c0bbb0;
+       font-size: 1.5rem;
+   }
+
+   .result-body { flex: 1; min-width: 0; }
+
+   .result-meta-line {
+       display: flex;
+       gap: 0.75rem;
+       align-items: center;
+       font-size: 0.8rem;
+       color: var(--kansan-muted);
+       margin-bottom: 0.5rem;
+       flex-wrap: wrap;
+   }
+
+   .result-source {
+       background: var(--kansan-text);
+       color: white;
+       padding: 0.15rem 0.55rem;
+       border-radius: 2px;
+       font-size: 0.7rem;
+       font-weight: 500;
+       text-transform: uppercase;
+       letter-spacing: 0.05em;
+   }
+
+   .result-context {
+       color: var(--kansan-muted);
+       text-decoration: none;
+       font-size: 0.75rem;
+       border-bottom: 1px dotted var(--kansan-muted);
+   }
+
+   .result-context:hover {
+       color: var(--kansan-accent);
+       border-bottom-color: var(--kansan-accent);
+   }
+
+   .result-title {
+       font-family: var(--kansan-serif);
+       font-size: 1.25rem;
+       font-weight: 500;
+       margin: 0 0 0.4rem;
+       line-height: 1.3;
+   }
+
+   .result-title a { color: var(--kansan-text); text-decoration: none; }
+   .result-title a:hover { color: var(--kansan-accent); text-decoration: underline; }
+
+   .result-snippet {
+       color: #333;
+       font-size: 0.95rem;
+       margin: 0;
+       line-height: 1.5;
+   }
+
+   /* OCR cards have no title — make the snippet their primary content, slightly
+   smaller than a title would be in list view. */
+.result-card-ocr_element .result-snippet {
+    font-size: 0.95rem;
+    line-height: 1.45;
+}
+.result-card-ocr_element .result-snippet a {
+    color: var(--kansan-text);
+    text-decoration: none;
+}
+.result-card-ocr_element .result-snippet a:hover {
+    color: var(--kansan-accent);
+    text-decoration: underline;
+}
+
+.view-grid .result-card-ocr_element .result-snippet {
+    display: block;
+}
+.view-grid .result-card-ocr_element .result-snippet {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+   .pagination {
+       display: flex;
+       justify-content: space-between;
+       margin-top: 2.5rem;
+       padding-top: 1.5rem;
+       border-top: 1px solid var(--kansan-border);
+   }
+
+   .pagination a { color: var(--kansan-accent); text-decoration: none; font-weight: 500; }
+   .pagination a:hover { text-decoration: underline; }
+   .pagination .disabled { color: #ccc; }
+
+   /* ============================================================
+   Results header bar (count · clear filters · sort)
+   ============================================================ */
+
+  .results-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin: 0 0 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--kansan-border);
+      color: var(--kansan-muted);
+      font-size: 0.9rem;
+  }
+
+  .result-count { margin-right: auto; }      /* push the rest to the right */
+  .result-count strong { color: var(--kansan-text); font-weight: 600; }
+
+  .results-header label { font-size: 0.85rem; }
+
+  .results-header select {
+      padding: 0.3rem 0.5rem;
+      border: 1px solid var(--kansan-border);
+      border-radius: 4px;
+      background: var(--kansan-surface);
+      font: inherit;
+      font-size: 0.9rem;
+      color: var(--kansan-text);
+  }
+
+  .results-header select:focus {
+      outline: none;
+      border-color: var(--kansan-accent);
+      box-shadow: 0 0 0 3px #7a2222;
+  }
+
+  .clear-filters {
+    color: var(--kansan-accent);
+    text-decoration: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.25rem 0.65rem;
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    background: var(--kansan-surface);
+    white-space: nowrap;
+}
+
+.clear-filters:hover {
+    border-color: var(--kansan-accent);
+    background: var(--kansan-accent);
+    color: white;
+}
+
+  /* Highlighted matches inside snippets */
+  .result-snippet mark {
+      background: #fff3a8;
+      color: inherit;
+      padding: 0 1px;
+      border-radius: 1px;
+  }
+
+  /* active-filter chips */
+  .filter-chips {
+    display: flex; flex-wrap: wrap; align-items: center;
+    gap: 0.4rem; margin: 0 0 1rem; min-height: 1.75rem;
+  }
+  .filter-chips-empty { color: var(--kansan-muted); font-size: 0.82rem; }
+  .filter-chip {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    max-width: 100%; padding: 0.25rem 0.6rem;
+    font-size: 0.82rem; line-height: 1.3; white-space: nowrap;
+    color: var(--kansan-text); background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border); border-radius: 999px;
+    text-decoration: none;
+  }
+  .filter-chip-label { color: var(--kansan-muted); font-weight: 500; }
+  .filter-chip-value { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 22ch; }
+  .filter-chip-x { font-size: 1rem; line-height: 1; color: var(--kansan-muted); }
+  .filter-chip:hover { border-color: var(--kansan-accent); color: var(--kansan-accent); }
+  .filter-chip:hover .filter-chip-x { color: var(--kansan-accent); }
+
+   /* ============================================================
+      Grid view
+      ============================================================ */
+
+      .result-list.view-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 1.5rem 1.25rem;
+          align-items: start;
+      }
+
+      .view-grid .result-card {
+          flex-direction: column;
+          border-bottom: none;
+          background: var(--kansan-surface);
+          border: 1px solid var(--kansan-border);
+          border-radius: 4px;
+          overflow: hidden;
+          padding: 0;
+      }
+
+      .view-grid .result-thumb {
+          flex: none;
+          width: 100%;
+          height: 110px;
+          background: var(--kansan-thumb);
+      }
+
+    .view-grid .result-card:not(.result-card-item) .result-thumb {
+      display: flex;
+      align-items: center;
+    }
+
+   .view-grid .result-thumb-empty { min-height: 60px; }
+
+   .view-grid .result-body { padding: 0.75rem; }
+
+   .view-grid .result-meta-line {
+       gap: 0.4rem;
+       margin-bottom: 0.4rem;
+   }
+
+   .view-grid .result-title {
+       font-size: 0.95rem;
+       margin: 0;
+       display: -webkit-box;
+       -webkit-line-clamp: 2;
+       -webkit-box-orient: vertical;
+       overflow: hidden;
+   }
+
+   .view-grid .result-snippet { display: none; }
+
+   /* ============================================================
+      Mobile: sidebar collapses above results
+      ============================================================ */
+
+      @media (max-width: 768px) {
+       .search-layout {
+           grid-template-columns: 1fr;
+           gap: 1rem;
+       }
+
+       .search-sidebar {
+           position: static;
+           order: -1;
+       }
+
+       .search-top input[type="search"] {
+           min-width: 0;
+       }
+
+       .result-card { gap: 0.75rem; }
+       .result-thumb { flex: 0 0 100px; }
+       .result-title { font-size: 1.05rem; }
+
+       .view-grid .result-card { min-width: 0; }
+   }
+
+/* ============================================================
+   Faceted refiners (sidebar)
+   ============================================================ */
+
+.facet-group {
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    background: var(--kansan-surface);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* B3.2 — collapsible facet groups */
+details.facet-group > summary {
+  cursor: pointer; list-style: none;
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0;
+}
+details.facet-group[open] > summary { margin-bottom: 0.75rem; }
+details.facet-group > summary::-webkit-details-marker { display: none; }
+details.facet-group > summary::after {
+  content: '▾'; font-size: 0.8rem; color: var(--kansan-muted);
+  transition: transform 0.15s ease;
+}
+details.facet-group[open] > summary::after { transform: rotate(180deg); }
+.facet-group-count {
+  font-weight: 400; font-size: 0.85rem; color: var(--kansan-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.facet-top { list-style: none; margin: 0 0 0.65rem; padding: 0; }
+
+/* B3.5 — facet "show more" */
+.facet-top.collapsed li:nth-child(n+6) { display: none; }
+.facet-more {
+  display: inline-block; margin-top: 0.4rem; padding: 0;
+  background: none; border: none; cursor: pointer;
+  color: var(--kansan-accent); font-size: 0.82rem;
+}
+.facet-more:hover { text-decoration: underline; }
+
+.facet-item {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.5rem;
+    align-items: baseline;
+    padding: 0.28rem 0.4rem;
+    border-radius: 3px;
+    text-decoration: none;
+    color: var(--kansan-text);
+    font-size: 0.88rem;
+}
+.facet-item:hover { background: var(--kansan-bg); }
+.facet-item.active {
+    background: var(--kansan-accent);
+    color: #fff;
+    font-weight: 500;
+}
+.facet-item.active:hover { background: var(--kansan-accent-hover); }
+
+.facet-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.facet-count { color: var(--kansan-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.facet-item.active .facet-count { color: rgba(255, 255, 255, 0.85); }
+
+/* The "all values" autocomplete box under each top list */
+.facet-all-input {
+    width: 100%;
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    background: var(--kansan-bg);
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--kansan-text);
+}
+.facet-all-input:focus {
+    outline: none;
+    border-color: var(--kansan-accent);
+    box-shadow: 0 0 0 3px #7a2222;
+}
+
+/* Facet box: force full width past Datasette's generic input rules.
+   The narrowness was a specificity collision — app.css styles inputs by
+   type, which outranks a lone .facet-all-input class. */
+.search-sidebar input.facet-all-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.filter-actions { margin-bottom: 1rem; }
+
+/* Search tips popover, inline with the search button */
+.search-tips {
+    position: relative;
+    margin: 0 0 0 0.25rem;
+    font-size: 0.88rem;
+}
+.search-tips summary {
+    cursor: pointer;
+    color: var(--kansan-muted);
+    padding: 0.45rem 0.6rem;
+    user-select: none;
+    list-style: none;
+}
+.search-tips summary::-webkit-details-marker { display: none; }
+.search-tips summary::before {
+    content: '?';
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    line-height: 1rem;
+    text-align: center;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-right: 0.4rem;
+    vertical-align: 1px;
+}
+.search-tips summary:hover,
+.search-tips[open] summary { color: var(--kansan-accent); }
+
+.search-tips ul {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin: 0.3rem 0 0;
+    padding: 0.8rem 1rem 0.8rem 2rem;
+    min-width: 22rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    color: var(--kansan-text);
+    line-height: 1.7;
+    z-index: 10;
+}
+.search-tips code {
+    background: var(--kansan-bg);
+    padding: 0.05rem 0.35rem;
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.88em;
+}
+
+/* ============================================================
+   ADDITIONS — append to end of custom.css
+   ============================================================ */
+
+/* ── Site header ── */
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 1.5rem;
+    background: #003459;  /* KU Night */
+    color: white;
+}
+
+.site-title {
+    font-family: var(--kansan-serif);
+    font-size: 1.1rem;
+    font-weight: 400;
+    color: white;
+    text-decoration: none;
+    letter-spacing: 0.01em;
+}
+
+.site-title:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.site-nav {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+}
+
+.site-nav a {
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+}
+
+.site-nav a:hover {
+    color: white;
+}
+
+/* Current page: an underline rather than a colour shift, so it reads
+   on the dark header without relying on colour alone. */
+.site-nav a[aria-current="page"] {
+    color: white;
+    text-decoration: underline;
+    text-underline-offset: 5px;
+    text-decoration-thickness: 2px;
+}
+
+.site-nav a:focus-visible {
+    outline: 2px solid white;
+    outline-offset: 3px;
+    border-radius: 2px;
+}
+
+/* ── AI notice — slim footer strip ── */
+.ai-notice {
+    padding: 0.5rem 1.5rem;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-align: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ai-notice a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: underline;
+}
+
+.ai-notice a:hover {
+    color: white;
+}
+
+/* ── About page ── */
+.about-content {
+    max-width: 90%;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 4rem;
+}
+
+.about-ai {
+    max-width: 80%;
+    border: 1px solid var(--kansan-border);
+    border-radius: 20px;
+    padding: 0.5rem 1.5rem;
+    margin: 1rem auto 1.5rem;
+    text-align: center;
+}
+
+.about-content h1 {
+    font-size: 2.25rem;
+    font-weight: 400;
+    margin: 0 0 1.5rem;
+}
+
+.about-content h2 {
+    font-size: 1.4rem;
+    font-weight: 500;
+    margin: 2.5rem 0 0.75rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--kansan-border);
+}
+
+.about-content h3
+.about-ai h3 {
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin: 1.75rem 0 0.5rem;
+}
+
+.about-content p {
+    line-height: 1.7;
+    margin: 0 0 1rem;
+}
+
+.about-content ul {
+    margin: 0.5rem 0 1rem 1.5rem;
+    line-height: 1.7;
+}
+
+.about-content li {
+    margin-bottom: 0.4rem;
+}
+
+.about-table {
+    width: 100%;
+    max-width: 760px;
+    border-collapse: collapse;
+    margin: 1rem 0 1.5rem;
+    font-size: 0.95rem;
+}
+
+.about-table th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--kansan-border);
+    font-family: var(--kansan-serif);
+    font-weight: 500;
+}
+
+.about-table td {
+    padding: 0.45rem 0.75rem;
+    border-bottom: 1px solid var(--kansan-border);
+}
+
+.about-table tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── Homepage AI notice block (below search form) ── */
+body.index .ai-notice-block {
+    max-width: 600px;
+    margin: 4rem auto 0;
+    font-size: 0.85rem;
+    color: var(--kansan-muted);
+    text-align: center;
+    line-height: 1.5;
+}
+
+body.index .ai-notice-block a {
+    color: var(--kansan-accent);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+body.index .ai-notice-block a:hover {
+    text-decoration: underline;
+}
+
+/* ── Hide Datasette's native header (breadcrumbs, hamburger).
+   Our .site-header replaces it. Kept in DOM for Datasette internals. ── */
+header.hd {
+    display: none;
+}
+
+/* ── Fix link color specificity inside site-header.
+   Datasette's app.css or existing `a` rules can win otherwise. ── */
+.site-header a,
+.site-header a:hover {
+    color: white;
+    text-decoration: none;
+}
+
+.site-title:hover,
+.site-nav a:hover {
+    color: rgba(255, 255, 255, 0.85);
+}
+
+/* Hide the footer element entirely on the homepage — both blocks are suppressed
+   there so it would otherwise render as an empty styled bar */
+body.index footer.ft {
+    display: none;
+}
+
+/* ============================================================
+   homepage tiles
+   ============================================================ */
+
+/* Tile row — 3 equal tiles, stacks on narrow screens */
+.home-tiles {
+    display: grid;
+    gap: 1rem;
+
+}
+
+body.index .home-tiles {
+  grid-template-columns: repeat(3, 1fr);
+  margin: 5rem auto 3rem;
+  max-width: 900px;
+}
+
+body.db-kansan .home-tiles {
+  grid-template-columns: repeat(4, 1fr);
+  margin: 3rem auto 3rem;
+  max-width: 90%;
+}
+
+.home-tiles a { text-decoration: none; }
+
+@media (max-width: 720px) {
+    .home-tiles { grid-template-columns: 1fr; }
+}
+
+.home-tile {
+    display: block;
+    padding: 1.25rem 1.25rem 1.1rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-radius: 6px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.home-tile:hover, .home-tile:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+    border-color: var(--kansan-accent);
+}
+
+/* Keyboard focus needs an indicator that doesn't rely on a 1px colour shift */
+.home-tile:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .home-tile { transition: none; }
+    .home-tile:hover, .home-tile:focus-visible { transform: none; }
+}
+
+.home-tile h2 {
+    font-family: var(--kansan-serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+    margin: 0 0 0.4rem;
+    color: var(--kansan-text);
+}
+
+.home-tile p {
+    margin: 0;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--kansan-muted);
+}
+
+#home-tile-today, #home-tile-data,
+#home-tile-map {
+  position: relative;
+}
+
+#home-tile-today::before, #home-tile-data::before,
+#home-tile-map::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 45%;
+  height: 75%;
+  background-position: bottom right;
+  background-repeat: no-repeat;
+  background-size: contain;
+  opacity: 0.6;
+  border-radius: inherit;
+}
+
+#home-tile-today::before {background-image: url("/static/assets/sunflower.png");}
+#home-tile-data::before {background-image: url("/static/assets/data.png");}
+#home-tile-map::before {background-image: url("/static/assets/spark.png");}
+
+/* Lighter text links below the tiles */
+.home-links {
+    max-width: 900px;
+    margin: 0 auto 1.5rem;
+    text-align: center;
+    font-size: 0.9rem;
+}
+
+.home-links a {
+    color: var(--kansan-accent);
+    text-decoration: none;
+}
+
+.home-links a:hover { text-decoration: underline; }
+
+#container-footer { position: relative; width: 100%;}
+#container-footer::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  background-image: url("/static/assets/seal.png");
+  background-position: right;
+  background-repeat: no-repeat;
+  background-size:  contain;
+  opacity: 0.5;
+  height: 150px;
+  width: 150px;
+}
+
+/* Explote page */
+.explore-link {
+    display: block;
+    margin-top: 0.6rem;
+    padding: 0.55rem 0.8rem;
+    text-align: center;
+    background: var(--kansan-accent);
+    color: #fff;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-decoration: none;
+}
+.explore-link:hover { background: var(--kansan-accent-hover); color: #fff; }
+
+/* Explore dashboard: filters arrive via the URL, so hide the input bar */
+.dashboard-filters { display: none; }
+
+/* Readout: present the table chart as a plain text panel */
+#card-search-readout .dashboard-card-title { display: none; }
+#card-search-readout th { display: none; }
+#card-search-readout table { border: none; border-collapse: collapse; }
+#card-search-readout td {
+    border: none; padding: 0;
+    font-size: 0.95rem; line-height: 1.7; color: var(--kansan-text);
+}
+
+/* header chart blocks for dashboard */
+#card-header-topics {
+  background: var(--kansan-bg);
+  box-shadow: None;
+}
+
+.data-note {
+  padding-top: 2rem;
+  font-style: italic;
+  font-size: 0.9rem;
+  color: var(--kansan-muted);
+}
+
+/* ============================================================
+   Data page (body.db-kansan)
+   Section headings, the collapsible full index, and the
+   export note. Moved here from an inline <style> block in
+   templates/database-kansan.html.
+   ============================================================ */
+
+.data-section-h {
+    font-family: var(--kansan-serif);
+    font-weight: 500;
+    font-size: 1.2rem;
+    margin: 2.5rem 0 0.75rem;
+}
+
+/* Qualifier inside a section heading — reads as a caption, not a title */
+.data-section-note {
+    color: var(--kansan-muted);
+    font-weight: 400;
+    font-size: 0.9rem;
+}
+
+/* Collapsible "Full database index" — the escape hatch to Datasette's
+   own database page, set apart from the curated sections above it. */
+.data-fullindex {
+    margin-top: 3rem;
+    border-top: 1px solid var(--kansan-border);
+    padding-top: 0.5rem;
+}
+
+.data-fullindex > summary {
+    cursor: pointer;
+    color: var(--kansan-accent);
+    font-weight: 500;
+    padding: 0.5rem 0;
+}
+
+.data-fullindex > summary:hover { color: var(--kansan-accent-hover); }
+
+.data-fullindex > summary:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 2px;
+    border-radius: 3px;
+}
+
+/* Datasette's default page reappears inside the <details>; inset it so it
+   reads as a nested panel rather than a second page competing with ours. */
+.data-fullindex[open] > :not(summary) {
+    margin-top: 0.5rem;
+    padding-left: 1rem;
+    border-left: 2px solid var(--kansan-border);
+}
+
+/* ============================================================
+   Search: empty state
+   Shown in place of results when a query matches nothing. Each
+   tip is a live link that runs a broader search.
+   ============================================================ */
+
+.no-results {
+    margin: 1.5rem 0 2rem;
+    padding: 1.25rem 1.5rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-left: 3px solid var(--kansan-accent);
+    border-radius: 6px;
+    max-width: 46rem;
+}
+
+.no-results-lead {
+    margin: 0 0 0.6rem;
+    font-family: var(--kansan-serif);
+    font-size: 1rem;
+    color: var(--kansan-text);
+}
+
+.no-results-tips {
+    margin: 0;
+    padding-left: 1.1rem;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--kansan-muted);
+}
+
+.no-results-tips li + li { margin-top: 0.45rem; }
+.no-results-tips strong { color: var(--kansan-text); font-weight: 600; }
+
+/* ============================================================
+   Search results: refinement links in the card meta line
+   Source / category / date each narrow the current search.
+   ============================================================ */
+
+.result-refine { text-decoration: none; }
+
+/* The source badge is already a solid chip — keep its shape, lift on hover */
+a.result-source:hover, a.result-source:focus-visible {
+    background: var(--kansan-accent);
+}
+a.result-source { color: #fff; }
+
+.result-category {
+    color: var(--kansan-muted);
+    border-bottom: 1px dotted var(--kansan-border);
+}
+
+a.result-category:hover, a.result-category:focus-visible,
+a.result-date:hover, a.result-date:focus-visible {
+    color: var(--kansan-accent);
+    border-bottom-color: var(--kansan-accent);
+}
+
+a.result-date {
+    color: var(--kansan-muted);
+    border-bottom: 1px dotted transparent;
+}
+
+.result-refine:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* Example term shown on a guided-search tile, so the click is predictable */
+.home-tile-eg {
+    margin: 0.5rem 0 0;
+    font-size: 0.78rem;
+    color: var(--kansan-muted);
+}
+.home-tile-eg strong {
+    color: var(--kansan-accent);
+    font-weight: 600;
+}
+
+/* ============================================================
+   Data page: conventions list, API examples, code sample
+   ============================================================ */
+
+.data-conventions {
+    max-width: 52rem;
+    margin: 0 0 1rem;
+}
+
+.data-conventions dl { margin: 0; }
+
+.data-conventions dt {
+    font-family: var(--kansan-serif);
+    font-size: 1rem;
+    font-weight: 500;
+    color: var(--kansan-text);
+    margin-top: 1.1rem;
+}
+
+.data-conventions dd {
+    margin: 0.3rem 0 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: var(--kansan-muted);
+}
+
+.data-conventions dd ul {
+    margin: 0.4rem 0 0;
+    padding-left: 1.1rem;
+}
+
+.data-conventions dd li { margin-bottom: 0.2rem; }
+
+.data-lead {
+    max-width: 52rem;
+    font-size: 0.9rem;
+    color: var(--kansan-muted);
+    margin: 0 0 0.6rem;
+}
+
+.data-examples {
+    margin: 0 0 1.25rem;
+    padding-left: 1.1rem;
+    font-size: 0.85rem;
+    line-height: 1.9;
+}
+
+/* Inline code and the sample block share one monospace treatment */
+.data-conventions code,
+.data-lead code,
+.data-examples code,
+.data-code code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.85em;
+}
+
+.data-conventions code,
+.data-lead code,
+.data-examples code {
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-radius: 3px;
+    padding: 0.05rem 0.3rem;
+}
+
+.data-code {
+    max-width: 52rem;
+    margin: 0 0 1rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-left: 3px solid var(--kansan-accent);
+    border-radius: 6px;
+    overflow-x: auto;
+    line-height: 1.55;
+}
+
+.data-code code {
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--kansan-text);
+}
+
+/* ============================================================
+   Today in History (body.today)
+   Moved here from an inline <style> block in templates/today.html.
+   ============================================================ */
+
+.today-page {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 3rem;
+}
+
+/* Eyebrow holds the page identity; the h1 below it holds the date */
+.today-eyebrow {
+    margin: 0 0 0.25rem;
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--kansan-muted);
+}
+
+.today-page h1 {
+    font-size: 2rem;
+    font-weight: 400;
+    margin: 0 0 0.25rem;
+}
+
+.today-page .today-sub {
+    color: var(--kansan-muted);
+    margin: 0 0 1.5rem;
+}
+
+.today-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin: 0 0 2rem;
+    padding: 0.75rem 1rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    flex-wrap: wrap;
+}
+
+.today-controls label { color: var(--kansan-muted); font-size: 0.9rem; }
+
+.today-controls input[type="date"] {
+    padding: 0.35rem 0.5rem;
+    font: inherit;
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    background: white;
+    color: var(--kansan-text);
+}
+
+.today-controls input[type="date"]:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 1px;
+}
+
+.today-controls .today-today-btn {
+    margin-left: auto;
+    padding: 0.4rem 0.8rem;
+    font: inherit;
+    font-size: 0.85rem;
+    color: var(--kansan-accent);
+    background: transparent;
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.today-controls .today-today-btn:hover { background: var(--kansan-bg); }
+
+.today-controls .today-today-btn:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 2px;
+}
+
+.today-status {
+    padding: 2rem 0;
+    text-align: center;
+    color: var(--kansan-muted);
+}
+
+/* Empty state — explains the gap and offers the neighbouring days */
+.today-empty {
+    max-width: 34rem;
+    margin: 1.5rem auto 0;
+    padding: 1.25rem 1.5rem;
+    background: var(--kansan-surface);
+    border: 1px solid var(--kansan-border);
+    border-left: 3px solid var(--kansan-accent);
+    border-radius: 6px;
+    text-align: center;
+}
+
+.today-empty-lead {
+    margin: 0 0 0.4rem;
+    font-family: var(--kansan-serif);
+    font-size: 1.05rem;
+    color: var(--kansan-text);
+}
+
+.today-empty-note {
+    margin: 0 0 0.9rem;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    color: var(--kansan-muted);
+}
+
+.today-empty-nav {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.today-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.25rem;
+}
+
+.today-cell {
+    display: flex;
+    flex-direction: column;
+    text-decoration: none;
+    color: inherit;
+    border: 1px solid var(--kansan-border);
+    border-radius: 4px;
+    background: var(--kansan-surface);
+    overflow: hidden;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.today-cell:hover, .today-cell:focus-visible {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-color: var(--kansan-accent);
+}
+
+/* Keyboard focus needs more than a 1px colour shift */
+.today-cell:focus-visible {
+    outline: 2px solid var(--kansan-accent);
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .today-cell { transition: none; }
+    .today-cell:hover, .today-cell:focus-visible { transform: none; }
+}
+
+.today-thumb {
+    aspect-ratio: 3 / 4;
+    background: var(--kansan-thumb);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.today-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top;
+    display: block;
+}
+
+.today-caption {
+    padding: 0.55rem 0.7rem 0.7rem;
+    border-top: 1px solid var(--kansan-border);
+}
+
+.today-year {
+    font-family: var(--kansan-serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+}
+
+.today-paper {
+    font-size: 0.78rem;
+    color: var(--kansan-muted);
+    margin-top: 0.15rem;
+    line-height: 1.3;
+}
+
+.today-date {
+    font-size: 0.72rem;
+    color: var(--kansan-muted);
+    margin-top: 0.15rem;
+}

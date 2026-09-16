@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}KU Student Newspaper Archive{% endblock %}
+{% block body_class %}index{% endblock %}
+
+{# Homepage has its own inline AI notice; suppress the footer #}
+{% block ai_notice %}{% endblock %}
+{% block footer %}{% endblock %}
+
+{% block content %}
+<div class="container">
+<div class="hero">
+
+  <h1>KU Student Newspaper Archive</h1>
+
+  <p class="lead">Full-text search across articles, ads, and OCR text, 1878–2017.</p>
+</div>
+
+  <form action="/kansan/search" method="get" class="search-form">
+    <input type="search" name="q" placeholder="Search the archive..." autofocus>
+    <button type="submit">Search</button>
+  </form>
+
+<div class="home-tiles">
+  <a class="home-tile" id="home-tile-today" href="/today">
+    <h2>Today in History</h2>
+    <p>Pages from this date across 140 years of student publishing at KU.</p>
+  </a>
+  <a class="home-tile" id="home-tile-map" href="/ads-map">
+    <h2>Advertisers Map</h2>
+    <p>Advertisers mapped by location across the collection.</p>
+  </a>
+  <a class="home-tile" id="home-tile-data" href="/kansan">
+    <h2>View as Data</h2>
+    <p>Explore the raw collection — tables, queries, and downloadable data.</p>
+  </a>
+</div>
+
+<div id="container-footer">
+<div class="ai-notice-block">
+  Metadata and OCR in this collection has been generated in part using AI
+  (artificial intelligence) technologies and may
+  be incomplete, misleading, or inaccurate. <a href="/about#ai-disclosure">Learn more</a>
+</div>
+
+<div class="stats">
+  <p>188,976 pages · 1.9 million items · 140 years</p>
+</div>
+</div>
+
+
+{% endblock %}

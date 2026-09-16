@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Today in History — KU Student Newspaper Archive{% endblock %}
+{% block body_class %}today{% endblock %}
+
+{# Styles for this page live in custom.css (section "Today in History"), which
+   is loaded site-wide via extra_css_urls in the Datasette config. #}
+
+{% block content %}
+<div class="today-page">
+  {# The eyebrow carries the page's identity so the heading is free to carry
+     the date once JavaScript fills it in. #}
+  <p class="today-eyebrow">This day in the archive</p>
+  <h1 id="today-heading">Today in History</h1>
+  <p class="today-sub" id="today-sub">Front pages published on this day, every year the papers ran one.</p>
+
+  <div class="today-controls">
+    <label for="date-picker">Pick a date:</label>
+    <input type="date" id="date-picker">
+    <a href="/today" class="today-today-btn" id="today-btn">Jump to today</a>
+  </div>
+
+  <noscript>
+    <p class="today-status">
+      This page assembles its results in the browser. With JavaScript turned off you can
+      still reach the same data directly:
+      <a href="/kansan/pages_on_this_day">pages from a given day</a> or
+      <a href="/kansan/pages_by_date">pages by date</a>.
+    </p>
+  </noscript>
+
+  <div id="today-results" class="today-status">Loading…</div>
+</div>
+
+<script>
+(function () {
+  var params = new URLSearchParams(window.location.search);
+  var dateParam = params.get('date');
+
+  // Build the working date. If ?date=YYYY-MM-DD is present and valid, use it;
+  // otherwise default to today. Constructed from parts, not parsed from the
+  // string, so the date stays local rather than shifting through UTC.
+  var d;
+  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    var parts = dateParam.split('-').map(Number);
+    d = new Date(parts[0], parts[1] - 1, parts[2]);
+    if (isNaN(d.getTime())) d = new Date();
+  } else {
+    d = new Date();
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  var mm  = pad(d.getMonth() + 1);
+  var dd  = pad(d.getDate());
+  var md  = mm + '-' + dd;              // the query keys on month-day only
+  var iso = d.getFullYear() + '-' + mm + '-' + dd;
+
+  var MD_OPTS = { month: 'long', day: 'numeric' };
+  var pretty  = d.toLocaleDateString(undefined, MD_OPTS);
+
+  document.getElementById('today-heading').textContent = pretty;
+  document.getElementById('today-sub').textContent =
+    'Front pages published on ' + pretty + ', every year the papers ran one.';
+
+  var picker = document.getElementById('date-picker');
+  picker.value = iso;
+  picker.addEventListener('change', function () {
+    if (picker.value) window.location.search = '?date=' + picker.value;
+  });
+
+  // ---- helpers ----
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function shiftDays(base, n) {
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate() + n);
+  }
+  function dateHref(x) {
+    return '?date=' + x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
+  }
+
+  var resultsEl = document.getElementById('today-results');
+
+  // Nothing on this date: say why, and give the reader somewhere to go.
+  function renderEmpty() {
+    resultsEl.className = 'today-empty';
+    resultsEl.innerHTML = '';
+    resultsEl.appendChild(el('p', 'today-empty-lead', 'No pages for ' + pretty + '.'));
+    resultsEl.appendChild(el('p', 'today-empty-note',
+      'The papers did not publish every day — summers, holidays, and the earliest ' +
+      'years are sparse. Try a nearby date:'));
+
+    var nav  = el('p', 'today-empty-nav');
+    var prev = shiftDays(d, -1);
+    var next = shiftDays(d, 1);
+
+    var back = el('a', null, '← ' + prev.toLocaleDateString(undefined, MD_OPTS));
+    back.href = dateHref(prev);
+    var fwd = el('a', null, next.toLocaleDateString(undefined, MD_OPTS) + ' →');
+    fwd.href = dateHref(next);
+
+    nav.appendChild(back);
+    nav.appendChild(fwd);
+    resultsEl.appendChild(nav);
+  }
+
+  function renderCells(rows) {
+    resultsEl.className = 'today-grid';
+    resultsEl.innerHTML = '';
+
+    rows.forEach(function (row) {
+      var a = el('a', 'today-cell');
+      a.href   = '/static/viewer.html?pid=' + encodeURIComponent(row.pid);
+      a.target = '_blank';
+      a.rel    = 'noopener';
+      a.setAttribute('aria-label',
+        [row.year, row.paper_name, row.date].filter(Boolean).join(' — '));
+
+      // Thumbnails come from the islandora TN datastream, matching the search
+      // page. The IIIF endpoint is rate-limited and this page can request a
+      // hundred-plus thumbnails at once. The pid keeps its literal colon here,
+      // exactly as the search page builds it.
+      var img = document.createElement('img');
+      img.loading = 'lazy';
+      img.alt = '';
+      img.src = 'https://digital.lib.ku.edu/islandora/object/' + row.pid +
+                '/datastream/TN/view';
+
+      var thumb = el('div', 'today-thumb');
+      thumb.appendChild(img);
+
+      var cap = el('div', 'today-caption');
+      cap.appendChild(el('div', 'today-year', row.year));
+      if (row.paper_name) cap.appendChild(el('div', 'today-paper', row.paper_name));
+      cap.appendChild(el('div', 'today-date', row.date));
+
+      a.appendChild(thumb);
+      a.appendChild(cap);
+      resultsEl.appendChild(a);
+    });
+  }
+
+  fetch('/kansan/pages_on_this_day.json?_shape=objects&md=' + encodeURIComponent(md))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var rows = (data && data.rows) || [];
+      if (!rows.length) { renderEmpty(); return; }
+      renderCells(rows);
+    })
+    .catch(function () {
+      resultsEl.className = 'today-status';
+      resultsEl.textContent =
+        'Could not load pages for ' + pretty + '. Refresh to try again.';
+    });
+})();
+</script>
+{% endblock %}

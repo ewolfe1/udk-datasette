@@ -1,0 +1,137 @@
+{% extends "default:database.html" %}
+
+{# Curated landing for the /kansan data page. Extends Datasette's default
+   database page: the full default (SQL editor, all tables/queries/views) is
+   preserved at the bottom inside a collapsible "Full database index". #}
+
+{# Styles for this page live in custom.css (section "Data page"), which is
+   loaded site-wide via extra_css_urls in the Datasette config. #}
+
+{% block content %}
+<div class="container">
+<div class="hero">
+
+  <h1>KU Student Newspaper Archive Data</h1>
+  <p class="lead">Every article, advertisement, and page of OCR text behind the archive — open to explore.<br/>
+  Pick a starting point below, or open the full index and SQL console at the bottom.<br/>
+  Prefer charts? <a href="/-/dashboards/kansan">See the dashboard</a>.</p>
+</div>
+
+{# Tiles open with an example already filled in, so the results page
+   demonstrates itself instead of landing empty. Each query is a substring
+   match against one column (subjects.name, named_entities.name,
+   ads.advertiser), so single words match far more broadly than phrases.
+   The subject example is one of the terms this page already advertises;
+   the entity and advertiser examples are UNVERIFIED placeholders — confirm
+   they return rows and swap in better ones. #}
+<h2 class="data-section-h">Start with a guided search <span class="data-section-note">— no SQL, examples included</span></h2>
+<div class="home-tiles">
+  <a class="home-tile" href="/kansan/subject_search?subject=football">
+    <h2>By subject</h2>
+    <p>Find articles tagged with a topic &mdash; &ldquo;football&rdquo;, &ldquo;protest&rdquo;, &ldquo;theatre&rdquo;.</p>
+    <p class="home-tile-eg">Opens on <strong>football</strong></p>
+  </a>
+  <a class="home-tile" href="/kansan/named_entity_search?entity_type=&name=Kansas">
+    <h2>By person or organization</h2>
+    <p>Pages that mention a named person or group.</p>
+    <p class="home-tile-eg">Opens on <strong>Kansas</strong></p>
+  </a>
+  <a class="home-tile" href="/kansan/advertiser_history?name=Jayhawk">
+    <h2>An advertiser over time</h2>
+    <p>Track a business across the years it ran ads.</p>
+    <p class="home-tile-eg">Opens on <strong>Jayhawk</strong></p>
+  </a>
+  <a class="home-tile" href="/kansan/articles_by_category_and_year?year_from=1960&amp;year_to=1975">
+    <h2>Articles by category &amp; year</h2>
+    <p>Counts by category across a range of years.</p>
+    <p class="home-tile-eg">Opens on <strong>1960&ndash;1975</strong></p>
+  </a>
+</div>
+
+<h2 class="data-section-h">Browse the collection <span class="data-section-note">— facet and filter, no SQL</span></h2>
+<div class="home-tiles">
+  <a class="home-tile" href="/kansan/v_item_subjects">
+    <h2>Articles by subject</h2>
+    <p>One row per article&ndash;subject tag &mdash; facet to see every article on a topic.</p>
+  </a>
+  <a class="home-tile" href="/kansan/v_item_entities">
+    <h2>Articles by person / org</h2>
+    <p>One row per article&ndash;entity mention.</p>
+  </a>
+  <a class="home-tile" href="/kansan/items">
+    <h2>All articles</h2>
+    <p>Every detected item in the database.</p>
+  </a>
+  <a class="home-tile" href="/kansan/ads">
+    <h2>All advertisements</h2>
+    <p>Every detected ad, with thumbnails and viewer links.</p>
+  </a>
+</div>
+
+<h2 class="data-section-h">All the data <span class="data-section-note">— SQL, downloads, and every table</span></h2>
+<div class="home-tiles">
+  <a class="home-tile" href="/kansan?sql=select+title%2C+date%2C+category%2C+summary+from+items+where+category+%3D+%27sports%27+order+by+date+limit+50">
+    <h2>Write SQL</h2>
+    <p>Open the query console with an example loaded &mdash; for anyone comfortable with SQL.</p>
+  </a>
+</div>
+
+<h2 class="data-section-h">Working with the data <span class="data-section-note">— conventions worth knowing before you download</span></h2>
+
+<div class="data-conventions">
+  <dl>
+    <dt>Several values in one cell</dt>
+    <dd><code>subjects</code>, <code>keywords</code>, and <code>named_entities</code> hold
+      multiple values in a single field, separated by a pipe
+      (<code>|</code>). Split on the pipe before analysing them &mdash; a cell
+      reading <code>football|homecoming</code> is two tags, not one.</dd>
+
+    <dt>Entity types are embedded in the name</dt>
+    <dd>Entities are commonly stored as <code>Name [type]</code>, for example
+      <code>Jane Smith [faculty]</code>. Not every entity carries a type, so
+      treat the bracketed part as optional when parsing.</dd>
+
+    <dt>Page identifiers</dt>
+    <dd>A <code>pid</code> looks like <code>ku-udk:101279</code> and is the key to
+      the images at KU Libraries:
+      <ul>
+        <li>IIIF image service &mdash; <code>https://digital.lib.ku.edu/iiif/2/{pid}~JP2</code></li>
+        <li>Thumbnail &mdash; <code>https://digital.lib.ku.edu/islandora/object/{pid}/datastream/TN/view</code></li>
+        <li>Full page record &mdash; <code>https://digital.lib.ku.edu/ku-udk/{number after the colon}</code></li>
+      </ul>
+    </dd>
+
+    <dt>Metadata is machine-generated</dt>
+    <dd>Categories, summaries, subjects, and entities were produced with AI, and
+      the OCR is machine-read from aged newsprint. Expect errors, and cite the
+      original page for anything that matters.
+      <a href="/about#ai-disclosure">More on this</a>.</dd>
+  </dl>
+</div>
+
+<h2 class="data-section-h">Get it as JSON <span class="data-section-note">— every table and query has an API</span></h2>
+
+<p class="data-lead">Add <code>.json</code> to any table or query URL. Results come
+back under a <code>rows</code> key when you ask for <code>_shape=objects</code>:</p>
+
+<ul class="data-examples">
+  <li><a href="/kansan/subject_search.json?_shape=objects&amp;subject=football"><code>/kansan/subject_search.json?_shape=objects&amp;subject=football</code></a></li>
+  <li><a href="/kansan/items.json?_shape=objects&amp;_size=100"><code>/kansan/items.json?_shape=objects&amp;_size=100</code></a></li>
+  <li><a href="/kansan/stats_by_year.json?_shape=objects"><code>/kansan/stats_by_year.json?_shape=objects</code></a></li>
+</ul>
+
+<pre class="data-code"><code>import requests, pandas as pd
+
+r = requests.get("https://example.org/kansan/subject_search.json",
+                 params={"subject": "football", "_shape": "objects"})
+df = pd.DataFrame(r.json()["rows"])</code></pre>
+
+<p class="data-note">Every table and query can be downloaded as CSV or JSON &mdash; look for the
+export links at the bottom of any table or result page.</p>
+
+<details class="data-fullindex">
+  <summary>Full database index &mdash; all tables, views, queries, and the SQL editor</summary>
+  {{ super() }}
+</details>
+</div>
+{% endblock %}

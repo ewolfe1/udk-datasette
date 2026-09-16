@@ -1,0 +1,1659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Page viewer — KU Student Newspaper Archive</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="/static/custom.css">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--kansan-bg, #f7f5f0);
+      font-family: var(--kansan-sans);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* ---- Header ---- */
+    .vi-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      padding: 0.7rem 1.25rem;
+      background: var(--kansan-surface, #fff);
+      border-bottom: 1px solid var(--kansan-border, #d7d2cb);
+    }
+    .vi-header h1 {
+      font-family: var(--kansan-serif);
+      font-size: 1.15rem;
+      font-weight: 500;
+      margin: 0;
+      color: var(--kansan-text, #333333);
+    }
+
+    .vi-header .vi-extlink {
+      margin-left: auto;
+      color: var(--kansan-accent, #0051ba);
+      text-decoration: none;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .vi-header .vi-extlink:hover { text-decoration: underline; }
+
+    /* Prev / next within an issue */
+    .vi-pagenav {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: 1rem;
+    }
+    .vi-pagenav-btn {
+      border: 1px solid var(--kansan-border, #d7d2cb);
+      border-radius: 4px;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.8rem;
+      text-decoration: none;
+      color: var(--kansan-accent, #0051ba);
+      background: #fff;
+      white-space: nowrap;
+    }
+    .vi-pagenav-btn:hover {
+      background: var(--kansan-accent, #0051ba);
+      border-color: var(--kansan-accent, #0051ba);
+      color: #fff;
+    }
+    .vi-pagenav-btn:focus-visible {
+      outline: 2px solid var(--kansan-accent, #0051ba);
+      outline-offset: 2px;
+    }
+    .vi-pagenav-btn[aria-disabled="true"] {
+      color: var(--kansan-muted, #5a6a86);
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .vi-pagenav-pos {
+      font-size: 0.78rem;
+      color: var(--kansan-muted, #5a6a86);
+      white-space: nowrap;
+    }
+    .vi-back {
+      color: var(--kansan-accent, #0051ba);
+      text-decoration: none;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .vi-back:hover { text-decoration: underline; }
+
+    /* ---- Layout ---- */
+    .vi-layout {
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    /* ---- Image panel ---- */
+    .vi-image {
+      overflow: hidden;        /* positioning context only — inner div scrolls */
+      background: #2a2a2a;
+      position: relative;
+    }
+    .vi-scroll {
+      position: absolute;
+      inset: 0;
+      overflow: auto;
+    }
+    .vi-scroll.mode-pan          { cursor: grab; }
+    .vi-scroll.mode-pan.dragging { cursor: grabbing; }
+    .vi-scroll.mode-select       { cursor: crosshair; }
+
+    #img-wrapper { position: relative; display: inline-block; }
+    #page-img { display: block; }
+    #highlight {
+      position: absolute;
+      border: 3px solid #e8b923;
+      box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 0 12px rgba(232,185,35,0.35);
+      background: rgba(232, 185, 35, 0.08);
+      pointer-events: none;
+    }
+    #highlight.approx {
+      border-style: dashed;
+      background: rgba(232, 185, 35, 0.04);
+    }
+    /* User-drawn selection marquee — dark dashes + white halo so it's visible
+       on both light text areas and dark page margins */
+    #selection {
+      position: absolute;
+      border: 2px dashed #666;
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+      background: rgba(120, 120, 120, 0.18);
+      pointer-events: none;
+      display: none;
+    }
+    .vi-loading {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #999;
+      font-size: 0.9rem;
+      white-space: nowrap;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    /* ---- Control overlay (top-right of image, fixed to visible panel) ---- */
+    .vi-overlay {
+      position: absolute;
+      top: 0.6rem;
+      right: 0.6rem;
+      z-index: 5;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.35rem;
+      background: rgba(28, 28, 28, 0.82);
+      border-radius: 6px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      opacity: 0.45;
+      transition: opacity 0.18s ease;
+    }
+    .vi-image:hover .vi-overlay,
+    .vi-overlay:focus-within { opacity: 1; }
+
+    .vi-ov-sep {
+      width: 1px;
+      align-self: stretch;
+      margin: 0.1rem 0.15rem;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .vi-ov-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      padding: 0;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font: inherit;
+      font-size: 1.1rem;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .vi-ov-btn svg { display: block; }
+    .vi-ov-btn:hover { background: rgba(255, 255, 255, 0.22); }
+    /* Active mode button — light grey, dark icon (monochrome) */
+    .vi-ov-btn[aria-pressed="true"] {
+      background: #d9d9d9;
+      border-color: #d9d9d9;
+      color: #1c1c1c;
+    }
+    .vi-help { position: relative; display: inline-flex; }
+    .vi-help > summary { list-style: none; cursor: pointer; }
+    .vi-help > summary::-webkit-details-marker { display: none; }
+    .vi-help-panel {
+      position: absolute; top: calc(100% + 0.4rem); right: 0; width: 220px;
+      padding: 0.7rem 0.8rem; background: var(--kansan-surface); color: var(--kansan-text);
+      border: 1px solid var(--kansan-border); border-radius: 6px;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.25); font-size: 0.8rem; z-index: 7;
+    }
+    .vi-help-panel strong { display: block; margin-bottom: 0.4rem; }
+    .vi-help-panel dl { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.7rem; margin: 0; }
+    .vi-help-panel dt { color: var(--kansan-muted); white-space: nowrap; }
+    .vi-help-panel dd { margin: 0; }
+
+    /* Confirmation popup for a drawn region */
+    .vi-crop-pop {
+      position: absolute;
+      z-index: 6;
+      background: var(--kansan-surface, #fff);
+      border: 1px solid var(--kansan-border, #d7d2cb);
+      border-radius: 6px;
+      box-shadow: 0 3px 14px rgba(0,0,0,0.25);
+      padding: 0.6rem 0.7rem;
+      font-size: 0.82rem;
+      color: var(--kansan-text, #333);
+      max-width: 220px;
+      display: none;
+    }
+    .vi-crop-pop .vi-crop-dims {
+      color: var(--kansan-muted, #5a6a86);
+      font-size: 0.75rem;
+      margin: 0 0 0.5rem;
+    }
+    .vi-crop-pop .vi-crop-actions { display: flex; gap: 0.4rem; }
+    .vi-crop-pop button {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      font: inherit;
+      font-size: 0.8rem;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      background: #f1f1f1;
+      color: #333;
+      white-space: nowrap;
+    }
+    .vi-crop-pop button:hover { background: #e2e2e2; }
+    .vi-crop-pop button.vi-crop-ok {
+      background: #333;
+      border-color: #333;
+      color: #fff;
+    }
+    .vi-crop-pop button.vi-crop-ok:hover { background: #1c1c1c; }
+
+    /* ---- Sidebar ---- */
+    .vi-side {
+      display: flex;
+      flex-direction: column;
+      background: var(--kansan-surface, #fff);
+      border-left: 1px solid var(--kansan-border, #d7d2cb);
+      min-height: 0;
+    }
+
+    .vi-pageinfo {
+      padding: 0.9rem 1.1rem 0.6rem;
+      border-bottom: 1px solid var(--kansan-border, #d7d2cb);
+    }
+    .vi-pageinfo .vi-date {
+      font-family: var(--kansan-serif);
+      font-size: 1rem;
+      color: var(--kansan-text);
+    }
+    .vi-pageinfo .vi-pagelabel {
+      color: var(--kansan-muted);
+      font-size: 0.85rem;
+      margin-top: 0.15rem;
+    }
+
+    .vi-cite-toggle  {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      width: 100%;
+      margin-top: 0.7rem;
+      padding: 0.5rem 0.9rem;
+      border: 1px solid var(--kansan-accent, #0051ba);
+      border-radius: 4px;
+      background: var(--kansan-surface, #fff);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--kansan-accent, #0051ba);
+      cursor: pointer;
+      list-style: none;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .vi-cite-toggle:hover { background: var(--kansan-accent, #0051ba); color: #fff; }
+    .vi-caret { display: inline-block; transition: transform 0.15s;  transform: rotate(180deg); }
+
+    .vi-cite-panel { margin-top: 0.7rem; }
+    .vi-cite-field { margin-bottom: 0.8rem; }
+    .vi-cite-field:last-child { margin-bottom: 0; }
+
+    .vi-cite-text {
+      margin: 0.2rem 0 0.4rem;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: var(--kansan-text);
+    }
+    .vi-cite-text em { font-style: italic; }
+
+    .vi-cite-link {
+      display: block;
+      font-size: 0.8rem;
+      color: var(--kansan-accent, #0051ba);
+      word-break: break-all;
+      margin: 0.2rem 0 0.4rem;
+    }
+
+    .vi-copy-btn {
+      padding: 0.3rem 0.6rem;
+      border: 1px solid var(--kansan-border, #d7d2cb);
+      border-radius: 4px;
+      background: var(--kansan-bg, #f7f5f0);
+      font: inherit;
+      font-size: 0.78rem;
+      color: var(--kansan-text);
+      cursor: pointer;
+    }
+    .vi-copy-btn:hover { background: var(--kansan-border, #d7d2cb); }
+    .vi-copy-btn.copied { color: var(--kansan-accent, #0051ba); border-color: var(--kansan-accent, #0051ba); }
+
+    .vi-dl-link {
+      display: inline-block;
+      font-size: 0.82rem;
+      color: var(--kansan-accent, #0051ba);
+      text-decoration: none;
+      margin-top: 0.2rem;
+    }
+    .vi-dl-link:hover { text-decoration: underline; }
+
+    /* Tabs */
+    .vi-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      padding: 0.6rem 1.1rem 0;
+      border-bottom: 1px solid var(--kansan-border, #d7d2cb);
+    }
+    .vi-tab {
+      border: none;
+      background: none;
+      padding: 0.4rem 0.55rem;
+      font: inherit;
+      font-size: 0.85rem;
+      color: var(--kansan-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .vi-tab:hover { color: var(--kansan-text); }
+    .vi-tab.active {
+      color: var(--kansan-accent);
+      border-bottom-color: var(--kansan-accent);
+      font-weight: 500;
+    }
+    .vi-tab .vi-tab-count {
+      color: var(--kansan-muted);
+      font-weight: 400;
+      font-size: 0.78rem;
+    }
+
+    /* Filter */
+    .vi-filter { padding: 0.6rem 1.1rem 0.2rem; }
+    .vi-filter input {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--kansan-border, #d7d2cb);
+      border-radius: 4px;
+      background: var(--kansan-bg, #f7f5f0);
+      font: inherit;
+      font-size: 0.85rem;
+    }
+    .vi-filter input:focus {
+      outline: none;
+      border-color: var(--kansan-accent, #0051ba);
+      box-shadow: 0 0 0 3px rgba(0, 81, 186, 0.18);
+    }
+
+    /* List */
+    .vi-list {
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+      padding: 0.4rem 0.6rem;
+    }
+    .vi-empty {
+      color: var(--kansan-muted);
+      font-size: 0.85rem;
+      padding: 1rem 0.5rem;
+      text-align: center;
+    }
+
+    /* AI disclosure — pinned to the bottom of the sidebar */
+    .vi-disclosure {
+      flex: 0 0 auto;
+      /* border-top: 1px solid var(--kansan-border, #d7d2cb); */
+      padding: 0.6rem 1.1rem 0.8rem;
+      background: var(--kansan-surface, #fff);
+    }
+    .vi-questions p {
+      margin: 0.6rem 0 0;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      color: var(--kansan-text);
+    }
+    /* .vi-disclosure a { color: var(--kansan-accent, #0051ba); } */
+
+    .vi-questions > summary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      width: 100%;
+      margin-top: 0.7rem;
+      padding: 0.5rem 0.9rem;
+      /* border: 1px solid var(--kansan-accent, #0051ba);
+      border-radius: 4px; */
+      background: var(--kansan-surface, #fff);
+      font: inherit;
+      font-size: 0.88rem;
+      font-weight: 500;
+      /* color: var(--kansan-accent, #0051ba); */
+      cursor: pointer;
+      list-style: none;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+
+    .vi-questions > summary:hover { background: var(--kansan-text, #5a6a86); color: #fff; }
+    .vi-questions > summary::-webkit-details-marker { display: none; }
+    .vi-questions[open] > summary .vi-caret { transform: rotate(180deg); }
+
+    .vi-row {
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 0.5rem 0.55rem;
+      cursor: pointer;
+    }
+    .vi-row:hover { background: var(--kansan-bg, #f7f5f0); }
+    .vi-row.selected {
+      background: var(--kansan-bg, #f7f5f0);
+      border-color: var(--kansan-border, #d7d2cb);
+    }
+    .vi-row.current { cursor: default; }
+    .vi-row.current:hover { background: none; }
+    .vi-row-head {
+      display: flex;
+      gap: 0.5rem;
+      align-items: baseline;
+    }
+    .vi-badge {
+      flex-shrink: 0;
+      background: var(--kansan-text);
+      color: #fff;
+      font-size: 0.62rem;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.12rem 0.4rem;
+      border-radius: 2px;
+    }
+    .vi-badge.ad   { background: #5a5a5a; }
+    .vi-badge.ocr  { background: #8a8276; }
+    .vi-badge.page { background: var(--kansan-accent, #0051ba); }
+    .vi-row-label {
+      font-size: 0.9rem;
+      color: var(--kansan-text);
+      line-height: 1.3;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    /* Inline detail */
+    .vi-detail {
+      display: none;
+      position: relative;
+      margin-top: 0.55rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid var(--kansan-border, #d7d2cb);
+      font-size: 0.85rem;
+    }
+    .vi-row.selected .vi-detail { display: block; }
+
+    .vi-detail-close {
+      position: absolute;
+      top: 0.4rem;
+      right: 0;
+      width: 1.4rem;
+      height: 1.4rem;
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--kansan-muted);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+    .vi-detail-close:hover { background: var(--kansan-bg, #f7f5f0); color: var(--kansan-text); }
+
+    .vi-detail-actions {
+      margin-top: 0.7rem;
+      padding-top: 0.6rem;
+      border-top: 1px solid var(--kansan-border, #d7d2cb);
+      display: flex;
+      gap: 0.4rem;
+    }
+    .vi-action-btn {
+      display: inline-block;
+      padding: 0.35rem 0.7rem;
+      border: 1px solid var(--kansan-accent, #0051ba);
+      border-radius: 4px;
+      background: var(--kansan-surface, #fff);
+      color: var(--kansan-accent, #0051ba);
+      font-size: 0.82rem;
+      font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .vi-action-btn:hover {
+      background: var(--kansan-accent, #0051ba);
+      color: #fff;
+    }
+
+    .vi-field { margin-bottom: 0.6rem; }
+    .vi-field:last-child { margin-bottom: 0; }
+    .vi-label {
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--kansan-muted);
+      margin-bottom: 0.15rem;
+    }
+    .vi-value { color: var(--kansan-text); line-height: 1.45; }
+    .vi-value.ocr-text { white-space: pre-wrap; }
+
+    .vi-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+    .vi-tag {
+      background: var(--kansan-bg, #f7f5f0);
+      border: 1px solid var(--kansan-border, #d7d2cb);
+      border-radius: 3px;
+      padding: 0.1rem 0.4rem;
+      font-size: 0.78rem;
+      color: var(--kansan-text);
+    }
+    /* Tags that lead somewhere: same chip, but clearly actionable */
+    a.vi-tag-link {
+      text-decoration: none;
+      cursor: pointer;
+      transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+    }
+    a.vi-tag-link:hover {
+      background: var(--kansan-accent, #0051ba);
+      border-color: var(--kansan-accent, #0051ba);
+      color: #fff;
+    }
+    a.vi-tag-link:focus-visible {
+      outline: 2px solid var(--kansan-accent, #0051ba);
+      outline-offset: 2px;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      a.vi-tag-link { transition: none; }
+    }
+    .vi-note {
+      color: var(--kansan-muted);
+      font-style: italic;
+      font-size: 0.82rem;
+      margin-top: 0.5rem;
+    }
+
+    /* Caption above a list (e.g. Pages tab) */
+    .vi-list-caption {
+      font-size: 0.78rem;
+      color: var(--kansan-muted);
+      padding: 0.3rem 0.55rem 0.5rem;
+    }
+
+    .vi-error {
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      color: var(--kansan-muted);
+    }
+
+    /* Mobile */
+    @media (max-width: 760px) {
+      .vi-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 50vh 1fr;
+      }
+      .vi-side { border-left: none; border-top: 1px solid var(--kansan-border); }
+    }
+
+    /* Visible keyboard focus on custom interactive elements */
+    .vi-tab:focus-visible,
+    .vi-row:focus-visible,
+    .vi-ov-btn:focus-visible,
+    .vi-copy-btn:focus-visible,
+    .vi-action-btn:focus-visible,
+    .vi-detail-close:focus-visible,
+    .vi-cite-toggle:focus-visible,
+    .vi-list:focus-visible {
+      outline: 2px solid var(--kansan-accent, #0051ba);
+      outline-offset: 2px;
+    }
+    a.vi-row { color: inherit; text-decoration: none; display: block; }
+  </style>
+</head>
+<body>
+  <div class="site-header">
+    <a class="site-title" href="/">KU Student Newspaper Archive</a>
+    <nav class="site-nav" aria-label="Site navigation">
+      <a href="/about">About</a>
+      <a href="/-/dashboards/kansan">Dashboard</a>
+    </nav>
+  </div>
+
+  <div class="vi-header">
+    <a class="vi-back" id="back-link" href="#" style="display:none;">← Back to results</a>
+    <h1 id="page-title">Loading…</h1>
+    <nav class="vi-pagenav" id="page-nav" aria-label="Pages in this issue" hidden>
+      <a class="vi-pagenav-btn" id="page-prev" href="#" rel="prev">← Prev</a>
+      <span class="vi-pagenav-pos" id="page-pos"></span>
+      <a class="vi-pagenav-btn" id="page-next" href="#" rel="next">Next →</a>
+    </nav>
+    <a class="vi-extlink" id="page-link" href="#" target="_blank" rel="noopener">
+      View full page at KU Libraries ↗
+    </a>
+  </div>
+
+  <div class="vi-layout" id="layout">
+    <div class="vi-image" id="viewer">
+
+      <div class="vi-overlay" id="overlay" role="toolbar" aria-label="Image controls">
+        <button type="button" class="vi-ov-btn" id="mode-pan"
+                title="Pan — drag to move" aria-label="Pan mode" aria-pressed="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 13V4.5a1.5 1.5 0 0 1 3 0V12"/>
+            <path d="M11 11.5V3a1.5 1.5 0 0 1 3 0v8.5"/>
+            <path d="M14 10.5V4a1.5 1.5 0 0 1 3 0v9"/>
+            <path d="M17 11.5a1.5 1.5 0 0 1 3 0V16a6 6 0 0 1-6 6h-2a6 6 0 0 1-5.2-3l-2.3-4a1.5 1.5 0 0 1 2.6-1.5L8.5 16"/>
+            <path d="M8 13V9a1.5 1.5 0 0 0-3 0v4"/>
+          </svg>
+        </button>
+        <button type="button" class="vi-ov-btn" id="mode-select"
+                title="Select region — drag to choose" aria-label="Select region mode" aria-pressed="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 2v14a2 2 0 0 0 2 2h14"/>
+            <path d="M18 22V8a2 2 0 0 0-2-2H2"/>
+          </svg>
+        </button>
+
+        <span class="vi-ov-sep" aria-hidden="true"></span>
+
+        <button type="button" class="vi-ov-btn" id="zoom-out"
+                title="Zoom out (−)" aria-label="Zoom out">−</button>
+        <button type="button" class="vi-ov-btn" id="zoom-in"
+                title="Zoom in (+)" aria-label="Zoom in">+</button>
+
+        <span class="vi-ov-sep" aria-hidden="true"></span>
+
+        <button type="button" class="vi-ov-btn" id="zoom-recenter"
+                title="Recenter on selection (0)" aria-label="Recenter on selection">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9"/>
+            <line x1="22" x2="18" y1="12" y2="12"/><line x1="6" x2="2" y1="12" y2="12"/>
+            <line x1="12" x2="12" y1="6" y2="2"/><line x1="12" x2="12" y1="22" y2="18"/>
+          </svg>
+        </button>
+        <button type="button" class="vi-ov-btn" id="zoom-fitpage"
+                title="Fit whole page (F)" aria-label="Fit whole page">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>
+            <path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>
+          </svg>
+        </button>
+        <details class="vi-help">
+          <summary class="vi-ov-btn" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">?</summary>
+          <div class="vi-help-panel">
+            <strong>Keyboard &amp; mouse</strong>
+            <dl>
+              <dt>Pan</dt><dd>drag, or arrow keys</dd>
+              <dt>Zoom</dt><dd>+ / −, or Ctrl/⌘ + scroll</dd>
+              <dt>Recenter</dt><dd>0</dd>
+              <dt>Fit page</dt><dd>F</dd>
+              <dt>Select region</dt><dd>crop button, then drag</dd>
+            </dl>
+          </div>
+        </details>
+      </div>
+
+      <div class="vi-crop-pop" id="crop-pop" role="dialog" aria-label="Download region">
+        <p class="vi-crop-dims" id="crop-dims"></p>
+        <div class="vi-crop-actions">
+          <button type="button" class="vi-crop-ok" id="crop-ok">Open crop ↗</button>
+          <button type="button" id="crop-cancel">Cancel</button>
+        </div>
+      </div>
+
+      <div class="vi-scroll mode-pan" id="scroller">
+        <span class="vi-loading" id="loading">Loading page image…</span>
+        <div id="img-wrapper">
+          <img id="page-img" alt="Newspaper page">
+          <div id="highlight" style="display:none;" aria-hidden="true"></div>
+          <div id="selection" aria-hidden="true"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="vi-side">
+      <div class="vi-pageinfo">
+        <div class="vi-date" id="page-date">—</div>
+        <div class="vi-pagelabel" id="page-label"></div>
+
+        <button type="button" class="vi-cite-toggle" id="cite-toggle"
+                aria-expanded="false" aria-controls="cite-panel">
+          Cite &amp; download <span class="vi-caret">▾</span>
+        </button>
+
+        <div class="vi-cite-panel" id="cite-panel" hidden>
+          <div class="vi-cite-field">
+            <div class="vi-label">Citation</div>
+            <p class="vi-cite-text" id="cite-text"></p>
+            <button type="button" class="vi-copy-btn" id="cite-copy">Copy citation</button>
+          </div>
+
+          <div class="vi-cite-field">
+            <div class="vi-label">Link to this view</div>
+            <a class="vi-cite-link" id="cite-link" href="#"></a>
+            <button type="button" class="vi-copy-btn" id="link-copy">Copy link</button>
+          </div>
+
+          <div class="vi-cite-field">
+            <div class="vi-label">Source record</div>
+            <a class="vi-dl-link" id="download-full" href="#" target="_blank" rel="noopener">
+              Full image &amp; OCR text at KU Libraries ↗
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div class="vi-tabs" id="tabs"></div>
+
+      <div class="vi-filter" id="filter-wrap" style="display:none;">
+        <input type="text" id="filter" placeholder="Filter this page…" autocomplete="off"
+               aria-label="Filter contents of this page">
+      </div>
+
+      <div class="vi-list" id="list" role="tabpanel" tabindex="0">
+        <div id="content-list">
+          <div class="vi-empty">Loading page contents…</div>
+        </div>
+        <div id="page-list" style="display:none;"></div>
+              </div>
+
+        <div class="vi-disclosure">
+        <details class="vi-questions">
+          <summary>Questions about this data? <span class="vi-caret">▾</span></summary>
+          <p>Descriptive metadata, item detection, and highlighted text for items on this page
+             has been generated in part using AI (artificial intelligence) technologies and may
+             be incomplete, misleading, or inaccurate.
+             <a href="/about#ai-disclosure" target="_blank" rel="noopener">Learn more</a></p>
+        </details>
+      </div>
+
+            </aside>  </div>
+
+  <div id="error" class="vi-error" style="display:none;"></div>
+
+  <script>
+    /* Show "← Back to results" only when the user arrived from the search page. */
+    (function () {
+      var ref = document.referrer;
+      if (!ref) return;
+      try {
+        var u = new URL(ref);
+        if (u.host === location.host && /\/search\b/.test(u.pathname)) {
+          var b = document.getElementById('back-link');
+          if (b) { b.href = ref; b.style.display = ''; }
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var pid           = params.get('pid');
+    var arrivalBbox   = params.get('bbox') || '';
+    var arrivalSource = params.get('source') || '';     // item | ad | ocr_element
+    var arrivalId     = params.get('source_id') || '';
+
+    var errorEl = document.getElementById('error');
+    function fail(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = 'block';
+      document.getElementById('layout').style.display = 'none';
+    }
+    if (!pid) { fail('Missing pid parameter.'); return; }
+
+    // ---- DOM refs ----
+    var img         = document.getElementById('page-img');
+    var viewer      = document.getElementById('viewer');
+    var scroller    = document.getElementById('scroller');
+    var highlight   = document.getElementById('highlight');
+    var contentList = document.getElementById('content-list');
+    var pageListEl  = document.getElementById('page-list');
+    var tabsEl      = document.getElementById('tabs');
+    var filterWrap  = document.getElementById('filter-wrap');
+    var filterInput = document.getElementById('filter');
+
+    // ---- IIIF ----
+    var iiifBase = 'https://digital.lib.ku.edu/iiif/2/' + pid + '~JP2';
+    var fullPageUrl = 'https://digital.lib.ku.edu/ku-udk/' + (pid.split(':')[1] || '');
+    document.getElementById('page-title').textContent = pid;
+    document.getElementById('page-link').href = fullPageUrl;
+
+    // ---- Citation state ----
+    var pagePaperName = '';     // from page record (post-rebuild)
+    var pageDate = '';          // ISO YYYY-MM-DD
+    var selectedItem = null;    // currently selected list item, or null (page-level)
+
+    // ---- View state ----
+    var originalWidth = 0;   // page width in original pixels (from info.json)
+    var scale = 1;           // original px -> displayed img px
+    var zoom  = 1;           // user zoom on top of the displayed image
+    var natW = 0, natH = 0;
+    var activeBbox = null;   // {x,y,w,h} in ORIGINAL pixel coords, or null
+    var activeApprox = false;
+
+    function parseBbox(s) {
+      if (!s) return null;
+      var p = s.split(',').map(Number);
+      if (p.length !== 4 || p.some(isNaN)) return null;
+      return { x: p[0], y: p[1], w: p[2], h: p[3] };
+    }
+    function bboxFromIiif(url) {
+      if (!url) return null;
+      try { return parseBbox(url.split('~JP2/')[1].split('/')[0]); }
+      catch (e) { return null; }
+    }
+
+    activeBbox = parseBbox(arrivalBbox);
+
+    // ---- Image rendering ----
+    function positionImage() { img.style.width = (natW * zoom) + 'px'; }
+
+    function drawHighlight() {
+      if (!activeBbox) { highlight.style.display = 'none'; return; }
+      highlight.style.display = '';
+      highlight.classList.toggle('approx', activeApprox);
+      highlight.style.left   = (activeBbox.x * scale * zoom) + 'px';
+      highlight.style.top    = (activeBbox.y * scale * zoom) + 'px';
+      highlight.style.width  = (activeBbox.w * scale * zoom) + 'px';
+      highlight.style.height = (activeBbox.h * scale * zoom) + 'px';
+    }
+
+    function fitPageZoom() {
+      return Math.min(scroller.clientWidth / natW, scroller.clientHeight / natH, 1);
+    }
+
+    function fitView() {
+      if (!activeBbox) { zoom = fitPageZoom(); positionImage(); drawHighlight(); return; }
+      var vw = scroller.clientWidth, vh = scroller.clientHeight;
+      var bw = activeBbox.w * scale, bh = activeBbox.h * scale;
+      // Never auto-zoom past 100% — magnifying past source resolution pixelates
+      // the image and any crop taken from it. Manual zoom can still exceed this.
+      zoom = Math.min(vh * 0.6 / bh, vw * 0.8 / bw, 1);
+      positionImage();
+      drawHighlight();
+      var cx = (activeBbox.x + activeBbox.w / 2) * scale * zoom;
+      var cy = (activeBbox.y + activeBbox.h / 2) * scale * zoom;
+      scroller.scrollLeft = Math.max(0, cx - vw / 2);
+      scroller.scrollTop  = Math.max(0, cy - vh / 2);
+    }
+
+    img.onload = function () {
+      document.getElementById('loading').style.display = 'none';
+      natW = img.naturalWidth;
+      natH = img.naturalHeight;
+      scale = originalWidth ? (natW / originalWidth) : 1;
+      fitView();
+    };
+    img.onerror = function () { fail('Failed to load the page image.'); };
+
+    fetch(iiifBase + '/info.json')
+      .then(function (r) { return r.json(); })
+      .then(function (info) {
+        originalWidth = info.width || 0;
+        img.src = iiifBase + '/full/1500,/0/default.jpg';
+      })
+      .catch(function () {
+        originalWidth = 0;
+        img.src = iiifBase + '/full/full/0/default.jpg';
+      });
+
+    // ---- Zoom / view controls ----
+    function applyZoom(newZoom) {
+      var vw = scroller.clientWidth, vh = scroller.clientHeight;
+      var cx, cy;
+      if (activeBbox) {
+        cx = (activeBbox.x + activeBbox.w / 2) * scale * newZoom;
+        cy = (activeBbox.y + activeBbox.h / 2) * scale * newZoom;
+      } else {
+        var ratio = newZoom / zoom;
+        cx = (scroller.scrollLeft + vw / 2) * ratio;
+        cy = (scroller.scrollTop  + vh / 2) * ratio;
+      }
+      zoom = newZoom;
+      positionImage();
+      drawHighlight();
+      scroller.scrollLeft = Math.max(0, cx - vw / 2);
+      scroller.scrollTop  = Math.max(0, cy - vh / 2);
+    }
+    function zoomIn()  { applyZoom(Math.min(zoom * 1.3, 3)); }
+    function zoomOut() { applyZoom(Math.max(zoom / 1.3, fitPageZoom())); }
+    function fitPage() {
+      zoom = fitPageZoom();
+      positionImage(); drawHighlight();
+      scroller.scrollTop = 0; scroller.scrollLeft = 0;
+    }
+
+    document.getElementById('zoom-in').onclick       = zoomIn;
+    document.getElementById('zoom-out').onclick      = zoomOut;
+    document.getElementById('zoom-recenter').onclick = fitView;   // recenter on selection
+    document.getElementById('zoom-fitpage').onclick  = fitPage;
+
+    scroller.addEventListener('wheel', function (e) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      e.preventDefault();
+      var next = zoom * (e.deltaY > 0 ? 0.9 : 1.1);
+      applyZoom(Math.min(Math.max(next, fitPageZoom()), 3));
+    }, { passive: false });
+
+    // Keyboard: +/- zoom, 0 recenter, F fit page, arrows pan.
+    // Ignored while typing in the filter box or with a modifier held.
+    var PAN = 80;
+    document.addEventListener('keydown', function (e) {
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      switch (e.key) {
+        case '+': case '=': zoomIn();  e.preventDefault(); break;
+        case '-': case '_': zoomOut(); e.preventDefault(); break;
+        case '0':           fitView(); e.preventDefault(); break;
+        case 'f': case 'F': fitPage(); e.preventDefault(); break;
+        case 'ArrowUp':    scroller.scrollTop  -= PAN; e.preventDefault(); break;
+        case 'ArrowDown':  scroller.scrollTop  += PAN; e.preventDefault(); break;
+        case 'ArrowLeft':  scroller.scrollLeft -= PAN; e.preventDefault(); break;
+        case 'ArrowRight': scroller.scrollLeft += PAN; e.preventDefault(); break;
+      }
+    });
+
+    // ---- Interaction modes: pan (drag to move) vs select (drag a region) ----
+    var mode = 'pan';
+    var selBox  = document.getElementById('selection');
+    var cropPop = document.getElementById('crop-pop');
+    var wrapper = document.getElementById('img-wrapper');
+    var panBtn  = document.getElementById('mode-pan');
+    var selBtn  = document.getElementById('mode-select');
+
+    function setMode(m) {
+      mode = m;
+      scroller.classList.toggle('mode-pan', m === 'pan');
+      scroller.classList.toggle('mode-select', m === 'select');
+      panBtn.setAttribute('aria-pressed', m === 'pan' ? 'true' : 'false');
+      selBtn.setAttribute('aria-pressed', m === 'select' ? 'true' : 'false');
+      clearSelection();
+    }
+    function clearSelection() {
+      selBox.style.display = 'none';
+      cropPop.style.display = 'none';
+      pendingCrop = null;
+    }
+    panBtn.onclick = function () { setMode('pan'); };
+    selBtn.onclick = function () { setMode('select'); };
+
+    // clientX/Y -> coordinates inside the image wrapper (display px)
+    function pointInWrapper(clientX, clientY) {
+      var r = wrapper.getBoundingClientRect();
+      return { x: clientX - r.left, y: clientY - r.top };
+    }
+
+    var dragging = false;
+    var dragStart = null;
+    var panOrigin = null;
+    var pendingCrop = null;   // {x,y,w,h} ORIGINAL px, awaiting confirm
+
+    scroller.addEventListener('mousedown', function (e) {
+      if (e.button !== 0) return;
+      if (e.target.closest('.vi-overlay') || e.target.closest('.vi-crop-pop')) return;
+
+      if (mode === 'pan') {
+        dragging = true;
+        scroller.classList.add('dragging');
+        panOrigin = {
+          scrollLeft: scroller.scrollLeft,
+          scrollTop:  scroller.scrollTop,
+          clientX: e.clientX,
+          clientY: e.clientY
+        };
+        e.preventDefault();
+      } else {
+        clearSelection();
+        dragging = true;
+        var p = pointInWrapper(e.clientX, e.clientY);
+        dragStart = p;
+        selBox.style.display = 'block';
+        selBox.style.left = p.x + 'px';
+        selBox.style.top = p.y + 'px';
+        selBox.style.width = '0px';
+        selBox.style.height = '0px';
+        e.preventDefault();
+      }
+    });
+
+    document.addEventListener('mousemove', function (e) {
+      if (!dragging) return;
+      if (mode === 'pan') {
+        scroller.scrollLeft = panOrigin.scrollLeft - (e.clientX - panOrigin.clientX);
+        scroller.scrollTop  = panOrigin.scrollTop  - (e.clientY - panOrigin.clientY);
+      } else {
+        var p = pointInWrapper(e.clientX, e.clientY);
+        var x = Math.min(p.x, dragStart.x);
+        var y = Math.min(p.y, dragStart.y);
+        selBox.style.left = x + 'px';
+        selBox.style.top = y + 'px';
+        selBox.style.width = Math.abs(p.x - dragStart.x) + 'px';
+        selBox.style.height = Math.abs(p.y - dragStart.y) + 'px';
+      }
+    });
+
+    document.addEventListener('mouseup', function (e) {
+      if (!dragging) return;
+      dragging = false;
+      scroller.classList.remove('dragging');
+      if (mode !== 'select') return;
+
+      var bx = parseFloat(selBox.style.left);
+      var by = parseFloat(selBox.style.top);
+      var bw = parseFloat(selBox.style.width);
+      var bh = parseFloat(selBox.style.height);
+      if (bw < 8 || bh < 8) { clearSelection(); return; }   // ignore tiny drags
+
+      // display px -> ORIGINAL px (divide out scale*zoom)
+      var f = scale * zoom;
+      pendingCrop = { x: bx / f, y: by / f, w: bw / f, h: bh / f };
+
+      // Popup is a child of .vi-image (non-scrolling). Place it at the mouse
+      // release point (relative to the panel), then clamp inside the panel.
+      var pr = viewer.getBoundingClientRect();
+      var POP_W = 220, POP_H = 80;
+      var popLeft = e.clientX - pr.left + 10;
+      var popTop  = e.clientY - pr.top + 10;
+      popLeft = Math.max(8, Math.min(popLeft, pr.width  - POP_W));
+      popTop  = Math.max(8, Math.min(popTop,  pr.height - POP_H));
+      cropPop.style.left = popLeft + 'px';
+      cropPop.style.top = popTop + 'px';
+      document.getElementById('crop-dims').textContent =
+        'Region: ' + Math.round(pendingCrop.w) + ' × ' + Math.round(pendingCrop.h) + ' px';
+      cropPop.style.display = 'block';
+    });
+
+    document.getElementById('crop-cancel').onclick = clearSelection;
+    document.getElementById('crop-ok').onclick = function () {
+      if (!pendingCrop) return;
+      window.open(regionUrl(pendingCrop), '_blank', 'noopener');
+      clearSelection();
+    };
+
+    // ---- Cite & download panel ----
+    (function () {
+      var toggle = document.getElementById('cite-toggle');
+      var panel  = document.getElementById('cite-panel');
+      toggle.addEventListener('click', function () {
+        var open = panel.hidden;
+        panel.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+
+      function copyButton(btnId, getText, label) {
+        var btn = document.getElementById(btnId);
+        if (!btn) return;
+        btn.addEventListener('click', function () {
+          var text = getText();
+          var done = function () {
+            btn.textContent = 'Copied \u2713';
+            btn.classList.add('copied');
+            setTimeout(function () { btn.textContent = label; btn.classList.remove('copied'); }, 1500);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, function () {});
+          }
+        });
+      }
+      copyButton('cite-copy', function () {
+        return document.getElementById('cite-text').dataset.plain || '';
+      }, 'Copy citation');
+      copyButton('link-copy', function () {
+        return document.getElementById('cite-link').href || '';
+      }, 'Copy link');
+    })();
+
+    // ---- DOM helpers ----
+    var TYPE_LABEL = { item: 'Articles', ad: 'Ads', ocr: 'OCR' };
+    var SOURCE_TO_TYPE = { item: 'item', ad: 'ad', ocr_element: 'ocr' };
+    // Inverse, for rebuilding a shareable URL from the current selection.
+    var TYPE_TO_SOURCE = { item: 'item', ad: 'ad', ocr: 'ocr_element' };
+
+    var rows = [];            // content rows: {type, id, el, search}
+    var currentTab = 'all';
+    var currentFilter = '';
+
+    function el(tag, cls, html) {
+      var n = document.createElement(tag);
+      if (cls) n.className = cls;
+      if (html != null) n.innerHTML = html;
+      return n;
+    }
+    function esc(s) {
+      var d = document.createElement('div'); d.textContent = (s == null ? '' : s);
+      return d.innerHTML;
+    }
+    // Each tag links to the canned query built for that dimension. Param names
+    // are the ones those queries declare (subject_search: subject;
+    // named_entity_search: name + entity_type).
+    function tagHref(kind, term) {
+      if (kind === 'subject') {
+        return '/kansan/subject_search?subject=' + encodeURIComponent(term);
+      }
+      if (kind === 'entity') {
+        return '/kansan/named_entity_search?entity_type=&name=' +
+               encodeURIComponent(term);
+      }
+      return null;
+    }
+
+    function tagList(value, kind) {
+      var parts = (value || '').split('|').map(function (s) { return s.trim(); })
+                               .filter(Boolean);
+      if (!parts.length) return null;
+      var wrap = el('div', 'vi-tags');
+      parts.forEach(function (p) {
+        // An entity may carry a "[type]" suffix. Show it, but match on the
+        // bare name — that's what the entities table stores.
+        var term = p.replace(/\s*\[[^\]]*\]\s*$/, '');
+        var href = tagHref(kind, term);
+        if (!href) { wrap.appendChild(el('span', 'vi-tag', esc(p))); return; }
+        var a = el('a', 'vi-tag vi-tag-link', esc(p));
+        a.href = href;
+        a.title = 'Find everything tagged \u201c' + term + '\u201d';
+        wrap.appendChild(a);
+      });
+      return wrap;
+    }
+    function field(label, valueNode) {
+      if (!valueNode) return null;
+      var f = el('div', 'vi-field');
+      f.appendChild(el('div', 'vi-label', esc(label)));
+      if (typeof valueNode === 'string') f.appendChild(el('div', 'vi-value', esc(valueNode)));
+      else { var v = el('div', 'vi-value'); v.appendChild(valueNode); f.appendChild(v); }
+      return f;
+    }
+
+    // ---- Title <-> OCR matching (borrow a bbox for articles) ----
+    function tokenize(s) {
+      return (s || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ')
+                      .split(/\s+/).filter(function (w) { return w.length >= 3; });
+    }
+    function toSet(arr) { var o = {}; arr.forEach(function (t) { o[t] = true; }); return o; }
+
+    // Match quality knobs:
+    //   COVERAGE  = fraction of the title's words present in the OCR block
+    //               (did we find the whole title?)
+    //   PRECISION = fraction of the OCR block made up of title words
+    //               (is the block mostly the title, i.e. a headline — not a
+    //               body paragraph that merely happens to contain the words?)
+    var COVERAGE_MIN  = 0.6;
+    var PRECISION_MIN = 0.5;
+
+    function matchArticlesToOcr(articles, ocrItems) {
+      var prepped = ocrItems.filter(function (o) { return o.bbox; }).map(function (o) {
+        var t = tokenize(o.data.text);
+        return { item: o, set: toSet(t), len: t.length };
+      });
+      if (!prepped.length) return;
+
+      articles.forEach(function (art) {
+        var uniq = Object.keys(toSet(tokenize(art.label)));
+        if (!uniq.length) return;                    // nothing matchable in the title
+
+        var best = null, bestScore = 0;
+        prepped.forEach(function (o) {
+          if (!o.len) return;
+          var found = 0;
+          uniq.forEach(function (t) { if (o.set[t]) found++; });
+          if (!found) return;
+          var coverage  = found / uniq.length;
+          var precision = found / o.len;
+          if (coverage < COVERAGE_MIN || precision < PRECISION_MIN) return;
+          var score = coverage + precision * 0.5;    // among survivors, favour the tightest
+          if (score > bestScore) { bestScore = score; best = o.item; }
+        });
+        if (best) { art.bbox = best.bbox; art.bboxBorrowed = true; }
+      });
+    }
+
+    // ---- Detail / rows ----
+    function buildDetail(item) {
+      var d = el('div', 'vi-detail');
+
+      var close = el('button', 'vi-detail-close', '\u2715');
+      close.setAttribute('type', 'button');
+      close.setAttribute('aria-label', 'Close details');
+      close.addEventListener('click', function (e) {
+        e.stopPropagation();   // don't bubble to the row click
+        deselect();
+      });
+      d.appendChild(close);
+
+      var fields = [];
+
+      if (item.type === 'item') {
+        fields.push(field('Category', item.data.category));
+        fields.push(field('Summary', item.data.summary));
+        fields.push(field('Subjects', tagList(item.data.subjects, 'subject')));
+        fields.push(field('People / orgs', tagList(item.data.named_entities, 'entity')));
+      } else if (item.type === 'ad') {
+        var cat = [item.data.category, item.data.subcategory].filter(Boolean).join(' \u00b7 ');
+        fields.push(field('Category', cat || null));
+        fields.push(field('Summary', item.data.summary));
+        fields.push(field('Keywords', tagList(item.data.keywords)));
+      } else { // ocr
+        var t = el('div', 'vi-value ocr-text'); t.textContent = item.data.text || '';
+        var f = el('div', 'vi-field');
+        f.appendChild(el('div', 'vi-label', 'OCR text'));
+        f.appendChild(t);
+        fields.push(f);
+      }
+
+      fields.filter(Boolean).forEach(function (f) { d.appendChild(f); });
+
+      if (item.type === 'item') {
+        if (item.bbox && item.bboxBorrowed) {
+          d.appendChild(el('div', 'vi-note', 'Region inferred from an OCR match \u2014 approximate.'));
+        } else if (!item.bbox) {
+          d.appendChild(el('div', 'vi-note', 'Not mapped to a page region.'));
+        }
+      }
+
+      // Prominent action: download the region image (real bboxes only).
+      if (item.bbox && !item.bboxBorrowed) {
+        var actions = el('div', 'vi-detail-actions');
+        var dl = el('a', 'vi-action-btn', 'Download region image \u2197');
+        dl.href = regionUrl(item.bbox);
+        dl.target = '_blank';
+        dl.rel = 'noopener';
+        // Suggested filename: the pid plus a region marker.
+        var fname = pid.replace(':', '-') + '-region.jpg';
+        dl.addEventListener('click', function (e) {
+          // Try a true download (fetch as blob). If the IIIF server doesn't
+          // permit CORS, fall back to opening in a new tab.
+          e.preventDefault();
+          fetch(dl.href, { mode: 'cors' })
+            .then(function (r) { if (!r.ok) throw new Error(); return r.blob(); })
+            .then(function (blob) {
+              var u = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = u; a.download = fname;
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(function () { URL.revokeObjectURL(u); }, 100);
+            })
+            .catch(function () { window.open(dl.href, '_blank', 'noopener'); });
+        });
+        actions.appendChild(dl);
+        d.appendChild(actions);
+      }
+
+      return d;
+    }
+
+    function buildRow(item) {
+      var row = el('div', 'vi-row');
+      row.dataset.type = item.type;
+      row.setAttribute('role', 'button');
+      row.setAttribute('tabindex', '0');
+      row.setAttribute('aria-expanded', 'false');
+      var head = el('div', 'vi-row-head');
+      head.appendChild(el('span', 'vi-badge ' + item.type,
+        esc(item.type === 'ocr' ? 'OCR' : item.type)));
+      head.appendChild(el('div', 'vi-row-label', esc(item.label)));
+      row.appendChild(head);
+      row.appendChild(buildDetail(item));
+      row.addEventListener('click', function () { selectRow(item, row); });
+      row.addEventListener('keydown', function (e) {
+        // Activate on Enter/Space; ignore when focus is inside the detail
+        // (so typing in nested inputs / pressing Space on inner buttons works).
+        if (e.target !== row) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          selectRow(item, row);
+        }
+      });
+      return row;
+    }
+
+    // ---- Citation & downloads ----
+    var MONTHS = ['January','February','March','April','May','June','July',
+                  'August','September','October','November','December'];
+
+    function formatLongDate(iso) {
+      // Parse manually to avoid Date()'s UTC off-by-one on YYYY-MM-DD.
+      var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+      if (!m) return iso || '';
+      return MONTHS[parseInt(m[2], 10) - 1] + ' ' + parseInt(m[3], 10) + ', ' + m[1];
+    }
+    function todayLong() {
+      var d = new Date();
+      return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    }
+    function regionUrl(b) {
+      return iiifBase + '/' + Math.round(b.x) + ',' + Math.round(b.y) + ',' +
+             Math.round(b.w) + ',' + Math.round(b.h) + '/full/0/default.jpg';
+    }
+
+    // Per-source citation title. OCR has none; ads get "[Advertisement]".
+    function citationTitle(item) {
+      if (!item) return '';
+      if (item.type === 'item') return item.data.title || '';
+      if (item.type === 'ad')   return item.data.advertiser
+        ? item.data.advertiser + ' [Advertisement]' : '';
+      return '';   // ocr: no title
+    }
+
+    function updateCitation() {
+      // Fall back to UDK only if paper_name is absent (pre-rebuild); correct post-rebuild.
+      var paper = pagePaperName || 'University Daily Kansan';
+      var dateStr = formatLongDate(pageDate);
+      var title = citationTitle(selectedItem);
+
+      var titleHtml  = title ? '\u201c' + esc(title) + ',\u201d ' : '';
+      var titlePlain = title ? '\u201c' + title + ',\u201d ' : '';
+      var tail = '. From KU Student Newspapers, University of Kansas Libraries. ' +
+                 fullPageUrl + ' (Accessed ' + todayLong() + ').';
+
+      document.getElementById('cite-text').innerHTML =
+        titleHtml + '<em>' + esc(paper) + '</em>, ' + esc(dateStr) + tail;
+      document.getElementById('cite-text').dataset.plain =
+        titlePlain + paper + ', ' + dateStr + tail;
+
+      // The viewer URL is what reproduces this exact view — page plus whatever
+      // is selected. It isn't kept in sync by history.replaceState, so build it
+      // from current state rather than reading location.href.
+      var viewUrl = location.origin + location.pathname +
+                    '?pid=' + encodeURIComponent(pid);
+      if (selectedItem) {
+        var srcParam = TYPE_TO_SOURCE[selectedItem.type];
+        if (srcParam && selectedItem.id != null) {
+          viewUrl += '&source=' + encodeURIComponent(srcParam) +
+                     '&source_id=' + encodeURIComponent(selectedItem.id);
+        }
+      }
+      var link = document.getElementById('cite-link');
+      link.href = viewUrl;
+      link.textContent = viewUrl;
+
+      document.getElementById('download-full').href = fullPageUrl;
+    }
+
+    function selectRow(item, row) {
+      // Clicking the already-open row does nothing — lets the user select its
+      // text without the click re-firing zoom/scroll. Use the ✕ to close.
+      if (row.classList.contains('selected')) return;
+
+      rows.forEach(function (r) {
+        r.el.classList.remove('selected');
+        r.el.setAttribute('aria-expanded', 'false');
+      });
+      row.classList.add('selected');
+      row.setAttribute('aria-expanded', 'true');
+      selectedItem = item;
+      activeBbox = item.bbox || null;
+      activeApprox = !!item.bboxBorrowed;
+      if (typeof clearSelection === 'function') clearSelection();
+      if (natW) fitView(); else drawHighlight();
+      row.scrollIntoView({ block: 'nearest' });
+      updateCitation();
+    }
+
+    function deselect() {
+      rows.forEach(function (r) {
+        r.el.classList.remove('selected');
+        r.el.setAttribute('aria-expanded', 'false');
+      });
+      selectedItem = null;
+      activeBbox = null; activeApprox = false;
+      drawHighlight();
+      updateCitation();
+    }
+
+    function applyFilters() {
+      var f = currentFilter.trim().toLowerCase();
+      var anyVisible = false;
+      rows.forEach(function (r) {
+        var show = (currentTab === 'all' || r.type === currentTab) &&
+                   (!f || r.search.indexOf(f) !== -1);
+        r.el.style.display = show ? '' : 'none';
+        if (show) anyVisible = true;
+      });
+      var empty = contentList.querySelector('.vi-empty');
+      if (empty) {
+        empty.style.display = anyVisible ? 'none' : '';
+        empty.textContent = f ? 'No matches on this page.' : 'Nothing in this view.';
+      }
+    }
+
+    function setTab(type) {
+      currentTab = type;
+      tabsEl.querySelectorAll('.vi-tab').forEach(function (t) {
+        var active = (t.dataset.type === type);
+        t.classList.toggle('active', active);
+        t.setAttribute('aria-selected', active ? 'true' : 'false');
+        t.setAttribute('tabindex', active ? '0' : '-1');
+      });
+      var listContainer = document.getElementById('list');
+      if (listContainer) listContainer.setAttribute('aria-labelledby', 'vi-tab-' + type);
+
+      var pagesMode = (type === 'pages');
+      filterWrap.style.display  = pagesMode ? 'none' : '';
+      pageListEl.style.display  = pagesMode ? '' : 'none';
+      contentList.style.display = pagesMode ? 'none' : '';
+      if (!pagesMode) applyFilters();
+    }
+
+    // Tablist keyboard nav: arrows + Home/End cycle and activate.
+    tabsEl.addEventListener('keydown', function (e) {
+      var tabs = Array.prototype.slice.call(tabsEl.querySelectorAll('.vi-tab'));
+      var idx = tabs.indexOf(document.activeElement);
+      if (idx < 0) return;
+      var next = null;
+      if (e.key === 'ArrowRight')      next = tabs[(idx + 1) % tabs.length];
+      else if (e.key === 'ArrowLeft')  next = tabs[(idx - 1 + tabs.length) % tabs.length];
+      else if (e.key === 'Home')       next = tabs[0];
+      else if (e.key === 'End')        next = tabs[tabs.length - 1];
+      if (next) {
+        e.preventDefault();
+        next.focus();
+        setTab(next.dataset.type);
+      }
+    });
+
+    filterInput.addEventListener('input', function () {
+      currentFilter = this.value;
+      applyFilters();
+    });
+
+    // Prev/next reuse the Pages-tab ordering, so the header and the list can't
+    // disagree about which page is which.
+    function renderPageNav(ordered) {
+      var nav = document.getElementById('page-nav');
+      if (!nav) return;
+      var idx = -1;
+      ordered.forEach(function (pg, i) { if (pg.pid === pid) idx = i; });
+      if (idx === -1 || ordered.length < 2) { nav.hidden = true; return; }
+
+      var prev = document.getElementById('page-prev');
+      var next = document.getElementById('page-next');
+      var pos  = document.getElementById('page-pos');
+      pos.textContent = 'Page ' + (idx + 1) + ' of ' + ordered.length;
+
+      [[prev, idx - 1, 'Previous page'], [next, idx + 1, 'Next page']]
+        .forEach(function (spec) {
+          var a = spec[0], target = ordered[spec[1]];
+          if (!target) {
+            a.removeAttribute('href');
+            a.setAttribute('aria-disabled', 'true');
+            a.removeAttribute('aria-label');
+          } else {
+            a.href = location.pathname + '?pid=' + encodeURIComponent(target.pid);
+            a.removeAttribute('aria-disabled');
+            a.setAttribute('aria-label', spec[2]);
+          }
+        });
+      nav.hidden = false;
+    }
+
+    function renderPages(pages) {
+      pageListEl.innerHTML = '';
+      pageListEl.appendChild(el('div', 'vi-list-caption', 'Pages from this date'));
+      pages.slice().reverse().forEach(function (pg, idx) {
+        var isCurrent = (pg.pid === pid);
+        var label = 'Page ' + (idx + 1) + ' of ' + pages.length;
+        var row;
+        if (isCurrent) {
+          row = el('div', 'vi-row current');
+          row.setAttribute('aria-current', 'page');
+        } else {
+          row = el('a', 'vi-row');
+          row.href = location.pathname + '?pid=' + encodeURIComponent(pg.pid);
+          row.setAttribute('aria-label', 'Open ' + label);
+        }
+        var head = el('div', 'vi-row-head');
+        head.appendChild(el('span', 'vi-badge page', 'Page'));
+        head.appendChild(el('div', 'vi-row-label',
+          esc(label) + (isCurrent ? ' <span class="vi-note" style="margin:0">(current)</span>' : '')));
+        row.appendChild(head);
+        pageListEl.appendChild(row);
+      });
+    }
+
+    function renderList(items, pages) {
+      contentList.innerHTML = '';
+      rows = [];
+
+      var counts = { item: 0, ad: 0, ocr: 0 };
+      items.forEach(function (it) { counts[it.type]++; });
+      var hasPages = pages.length > 1;   // siblings beyond the current page
+
+      // Tabs: All, present content types, then Pages
+      var tabDefs = [['all', 'All', null]];
+      ['item', 'ad', 'ocr'].forEach(function (t) {
+        if (counts[t]) tabDefs.push([t, TYPE_LABEL[t], counts[t]]);
+      });
+      if (hasPages) tabDefs.push(['pages', 'Pages', pages.length]);
+
+      tabsEl.innerHTML = '';
+      tabsEl.setAttribute('role', 'tablist');
+      tabsEl.setAttribute('aria-label', 'Page contents');
+      tabDefs.forEach(function (def) {
+        var label = def[1] + (def[2] != null
+          ? ' <span class="vi-tab-count">' + def[2] + '</span>' : '');
+        var b = el('button', 'vi-tab', label);
+        b.dataset.type = def[0];
+        b.id = 'vi-tab-' + def[0];
+        b.setAttribute('type', 'button');
+        b.setAttribute('role', 'tab');
+        b.setAttribute('aria-controls', 'list');
+        b.setAttribute('aria-selected', 'false');
+        b.setAttribute('tabindex', '-1');
+        b.onclick = function () { setTab(def[0]); };
+        tabsEl.appendChild(b);
+      });
+
+      if (hasPages) {
+        renderPages(pages);
+        renderPageNav(pages.slice().reverse());
+      }
+
+      if (!items.length) {
+        contentList.appendChild(el('div', 'vi-empty', 'No structured content found for this page.'));
+      } else {
+        filterWrap.style.display = '';
+        items.forEach(function (it) {
+          var row = buildRow(it);
+          contentList.appendChild(row);
+          rows.push({ type: it.type, id: it.id, el: row, search: it.search });
+        });
+        var emptyNode = el('div', 'vi-empty', '');
+        emptyNode.style.display = 'none';
+        contentList.appendChild(emptyNode);
+      }
+
+      // Default tab + selection = the item the user arrived on
+      var arrivalType = SOURCE_TO_TYPE[arrivalSource] || 'all';
+      setTab(counts[arrivalType] ? arrivalType : 'all');
+
+      var match = items.filter(function (it) {
+        return it.type === arrivalType && String(it.id) === String(arrivalId);
+      })[0];
+      if (match) {
+        var r = rows.filter(function (r) {
+          return r.id === match.id && r.type === match.type;
+        })[0];
+        if (r) selectRow(match, r.el);
+      }
+    }
+
+    // ---- Fetch: page record first (for date + header), then contents + siblings ----
+    function j(url) { return fetch(url).then(function (r) { return r.json(); }); }
+    function jSafe(url) { return j(url).catch(function () { return { rows: [] }; }); }
+    var P = encodeURIComponent(pid);
+
+    jSafe('/kansan/pages/' + pid + '.json?_shape=objects')
+      .then(function (d) {
+        var page = (d.rows && d.rows[0]) || {};
+        var lbl = [page.paper_name, page.volume ? 'Vol. ' + page.volume : '',
+                   page.number ? 'No. ' + page.number : '']
+                    .filter(Boolean).join(' \u00b7 ');
+        document.getElementById('page-date').textContent = page.date ? formatLongDate(page.date) : pid;
+        document.getElementById('page-label').textContent = lbl;
+        if (page.date) document.getElementById('page-title').textContent = formatLongDate(page.date);
+        var date = page.date || '';
+
+        pagePaperName = page.paper_name || '';
+        pageDate = date;
+        updateCitation();           // page-level citation until something is selected
+
+        return Promise.all([
+          jSafe('/kansan/items_for_page.json?_shape=objects&pid=' + P),
+          jSafe('/kansan/ads_for_page.json?_shape=objects&pid=' + P),
+          jSafe('/kansan/ocr_for_page.json?_shape=objects&pid=' + P),
+          date ? jSafe('/kansan/pages_by_date.json?_shape=objects&date_prefix=' + encodeURIComponent(date))
+               : Promise.resolve({ rows: [] })
+        ]);
+      })
+      .then(function (res) {
+        var items = [];
+
+        (res[0].rows || []).forEach(function (r) {
+          items.push({
+            type: 'item', id: r.id, bbox: null,
+            label: r.title || '(untitled article)',
+            search: [r.title, r.summary, r.subjects, r.named_entities, r.category]
+                      .join(' ').toLowerCase(),
+            data: r
+          });
+        });
+        (res[1].rows || []).forEach(function (r) {
+          items.push({
+            type: 'ad', id: r.id, bbox: bboxFromIiif(r.iiif_url),
+            label: r.advertiser || '(advertisement)',
+            search: [r.advertiser, r.summary, r.keywords, r.category, r.subcategory]
+                      .join(' ').toLowerCase(),
+            data: r
+          });
+        });
+        (res[2].rows || []).forEach(function (r) {
+          var txt = (r.text || '').trim();
+          items.push({
+            type: 'ocr', id: r.id, bbox: bboxFromIiif(r.iiif_url),
+            label: txt ? (txt.length > 90 ? txt.slice(0, 90) + '\u2026' : txt) : '(no text)',
+            search: txt.toLowerCase(),
+            data: r
+          });
+        });
+
+        // Borrow bboxes for articles from matching OCR elements
+        var articles = items.filter(function (i) { return i.type === 'item'; });
+        var ocrs     = items.filter(function (i) { return i.type === 'ocr'; });
+        matchArticlesToOcr(articles, ocrs);
+
+        renderList(items, res[3].rows || []);
+      });
+  })();
+  </script>
+</body>
+</html>
