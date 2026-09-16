@@ -8,3 +8,10 @@ __pycache__/
 *.db
 /zOld/
 *.jpg
+build/
+dist/
+scripts*
+datasette.spec
+log-and-notes.md
+run_datasette.py
+kansan*.md
