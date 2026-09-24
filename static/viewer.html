@@ -512,6 +512,7 @@
       padding-top: 0.6rem;
       border-top: 1px solid var(--kansan-border, #d7d2cb);
       display: flex;
+      flex-wrap: wrap;
       gap: 0.4rem;
     }
     .vi-action-btn {
@@ -529,6 +530,23 @@
     .vi-action-btn:hover {
       background: var(--kansan-accent, #0051ba);
       color: #fff;
+    }
+    /* Flag button: quieter than Download so the two don't compete */
+    .vi-flag-btn {
+      font-family: inherit;
+      border-color: var(--kansan-border, #d7d2cb);
+      color: var(--kansan-muted, #5a6a86);
+    }
+    .vi-flag-btn:hover {
+      background: var(--kansan-bg, #f7f5f0);
+      border-color: var(--kansan-muted, #5a6a86);
+      color: var(--kansan-text, #333333);
+    }
+    .vi-flag-btn:disabled {
+      background: none;
+      border-color: var(--kansan-border, #d7d2cb);
+      color: var(--kansan-muted, #5a6a86);
+      cursor: default;
     }
 
     .vi-field { margin-bottom: 0.6rem; }
@@ -1217,6 +1235,36 @@
       });
     }
 
+    // ---- Flag an OCR line for staff to reprocess ----
+    // Sends only the OCR id; the server looks up the text and bbox itself.
+    function buildFlagButton(item) {
+      var btn = el('button', 'vi-action-btn vi-flag-btn', 'Flag text error');
+      btn.setAttribute('type', 'button');
+      btn.title = 'Let archive staff know this text has errors';
+
+      function finish(label) { btn.textContent = label; btn.disabled = true; }
+
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Sending\u2026';
+        fetch('/-/flag-ocr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ocr_id: item.id })
+        })
+          .then(function (r) {
+            if (r.status === 429) return finish('Too many flags. Try again later.');
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            finish('Flagged \u2713');
+          })
+          .catch(function () {
+            btn.disabled = false;
+            btn.textContent = 'Not sent. Try again';
+          });
+      });
+      return btn;
+    }
+
     // ---- Detail / rows ----
     function buildDetail(item) {
       var d = el('div', 'vi-detail');
@@ -1260,9 +1308,10 @@
         }
       }
 
+      var actions = el('div', 'vi-detail-actions');
+
       // Prominent action: download the region image (real bboxes only).
       if (item.bbox && !item.bboxBorrowed) {
-        var actions = el('div', 'vi-detail-actions');
         var dl = el('a', 'vi-action-btn', 'Download region image \u2197');
         dl.href = regionUrl(item.bbox);
         dl.target = '_blank';
@@ -1285,9 +1334,12 @@
             .catch(function () { window.open(dl.href, '_blank', 'noopener'); });
         });
         actions.appendChild(dl);
-        d.appendChild(actions);
       }
 
+      // OCR lines only: let visitors flag bad text for staff to reprocess.
+      if (item.type === 'ocr') actions.appendChild(buildFlagButton(item));
+
+      if (actions.children.length) d.appendChild(actions);
       return d;
     }
 
