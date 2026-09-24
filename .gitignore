@@ -15,3 +15,4 @@ datasette.spec
 log-and-notes.md
 run_datasette.py
 kansan*.md
+*_bak*
