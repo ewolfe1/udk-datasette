@@ -359,6 +359,7 @@ plugins:
           query: |
             SELECT name, count
             FROM stats_top_entities
+            WHERE name IS NOT NULL AND name <> '' AND name <> 'nan'
             ORDER BY count DESC
             LIMIT 20
           library: vega-lite
@@ -1144,6 +1145,21 @@ databases:
           FROM pages
           WHERE date LIKE :date_prefix || '%'
           ORDER BY date, pid
+          LIMIT 100
+        params: [date_prefix]
+
+      pages_by_month:
+        title: Browse front pages by month
+        description: >-
+          date_prefix: a year-month (1995-02). Returns one row per day in that
+          month — the front (highest-pid) page of that day's issue — so results
+          stay bounded regardless of how often the paper ran that month.
+        sql: |
+          SELECT pid, date, year, paper_name, volume, number, page_url, MAX(pid) AS max_pid
+          FROM pages
+          WHERE date LIKE :date_prefix || '%'
+          GROUP BY date
+          ORDER BY date
           LIMIT 100
         params: [date_prefix]
 

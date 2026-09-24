@@ -138,6 +138,12 @@
               {% if filters_active %}
                 <li><a href="?q={{ q|urlencode }}">Search <strong>{{ q }}</strong> again</a> - clear the filters</li>
               {% endif %}
+              {% if year_from or year_to %}
+                <li><a href="?q={{ q|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}">Widen the year range</a> — drop the year filter and search all 140 years.</li>
+              {% endif %}
+              {% if source != 'ocr_element' %}
+                <li><a href="?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}&source=ocr_element">Search OCR page text</a> — your terms may appear in the scanned page but not in an article or ad summary.</li>
+              {% endif %}
               {% if '*' not in q %}
                 <li><a href="?q={{ (q ~ '*')|urlencode }}">Search <strong>{{ q }}*</strong></a>
                     — try using wildcards to catch more results.</li>

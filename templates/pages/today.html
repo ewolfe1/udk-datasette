@@ -14,10 +14,17 @@
   <h1 id="today-heading">Today in History</h1>
   <p class="today-sub" id="today-sub">Front pages published on this day, every year the papers ran one.</p>
 
-  <div class="today-controls">
+  <form class="today-controls" id="date-form">
     <label for="date-picker">Pick a date:</label>
     <input type="date" id="date-picker">
+    <button type="submit" class="today-go-btn">Go</button>
     <a href="/today" class="today-today-btn" id="today-btn">Jump to today</a>
+  </form>
+
+  <div class="today-modes">
+    <a class="today-mode-btn" data-mode="years" href="#">Every year, this day</a>
+    <a class="today-mode-btn" data-mode="exact" href="#">Just this date</a>
+    <a class="today-mode-btn" data-mode="month" href="#">This whole month</a>
   </div>
 
   <noscript>
@@ -35,38 +42,99 @@
 <script>
 (function () {
   var params = new URLSearchParams(window.location.search);
-  var dateParam = params.get('date');
+  var dateParam  = params.get('date');
+  var monthParam = params.get('month');
+  var modeParam  = params.get('mode');   // 'exact' selects a single specific date
+  var isMonthMode = !!(monthParam && /^\d{4}-\d{2}$/.test(monthParam));
 
-  // Build the working date. If ?date=YYYY-MM-DD is present and valid, use it;
-  // otherwise default to today. Constructed from parts, not parsed from the
-  // string, so the date stays local rather than shifting through UTC.
-  var d;
+  // Build the working date. Always prefer ?date=YYYY-MM-DD when present and
+  // valid — including in month mode, so switching to "All of November 1963"
+  // from November 15 doesn't silently reset the picked day to the 1st. Only
+  // fall back to the 1st of the browsed month when there's no date at all to
+  // anchor to (a bare ?month= link with nothing else). Otherwise: today. Built
+  // from parts, not parsed from the string, so the date stays local rather
+  // than shifting through UTC.
+  var d = null;
   if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
     var parts = dateParam.split('-').map(Number);
-    d = new Date(parts[0], parts[1] - 1, parts[2]);
-    if (isNaN(d.getTime())) d = new Date();
-  } else {
-    d = new Date();
+    var candidate = new Date(parts[0], parts[1] - 1, parts[2]);
+    if (!isNaN(candidate.getTime())) d = candidate;
   }
+  if (!d && isMonthMode) {
+    var mParts = monthParam.split('-').map(Number);
+    d = new Date(mParts[0], mParts[1] - 1, 1);
+  }
+  if (!d) d = new Date();
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
   var mm  = pad(d.getMonth() + 1);
   var dd  = pad(d.getDate());
-  var md  = mm + '-' + dd;              // the query keys on month-day only
+  var md  = mm + '-' + dd;              // the "every year" query keys on month-day only
   var iso = d.getFullYear() + '-' + mm + '-' + dd;
+  var ym  = d.getFullYear() + '-' + mm;  // this date's year-month, for the "whole month" link
 
-  var MD_OPTS = { month: 'long', day: 'numeric' };
-  var pretty  = d.toLocaleDateString(undefined, MD_OPTS);
+  // Three modes, all derived from the same picked date:
+  //   years (default) — this month-day, across every year
+  //   exact            — this one specific date               (?mode=exact)
+  //   month            — every day's front page in this month (?month=YYYY-MM)
+  var isExactMode = !isMonthMode && modeParam === 'exact';
+  var monthValue  = isMonthMode ? monthParam : ym;
 
-  document.getElementById('today-heading').textContent = pretty;
-  document.getElementById('today-sub').textContent =
-    'Front pages published on ' + pretty + ', every year the papers ran one.';
+  var MD_OPTS   = { month: 'long', day: 'numeric' };
+  var FULL_OPTS = { year: 'numeric', month: 'long', day: 'numeric' };
+  var pretty     = d.toLocaleDateString(undefined, MD_OPTS);       // "September 19"
+  var prettyFull = d.toLocaleDateString(undefined, FULL_OPTS);     // "September 19, 2026"
+  var monthLabel = new Date(Number(monthValue.slice(0, 4)), Number(monthValue.slice(5, 7)) - 1, 1)
+                     .toLocaleDateString(undefined, { year: 'numeric', month: 'long' }); // "September 2026"
+
+  var headingEl = document.getElementById('today-heading');
+  var subEl     = document.getElementById('today-sub');
+
+  if (isMonthMode) {
+    headingEl.textContent = monthLabel;
+    subEl.textContent = 'Front pages published in ' + monthLabel + ', one per day.';
+  } else if (isExactMode) {
+    headingEl.textContent = prettyFull;
+    subEl.textContent = 'Pages published on ' + prettyFull + '.';
+  } else {
+    headingEl.textContent = pretty;
+    subEl.textContent = 'Front pages published on ' + pretty + ', every year the papers ran one.';
+  }
 
   var picker = document.getElementById('date-picker');
   picker.value = iso;
-  picker.addEventListener('change', function () {
-    if (picker.value) window.location.search = '?date=' + picker.value;
+  document.getElementById('date-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (!picker.value) return;
+    if (isMonthMode) {
+      window.location.search = '?month=' + picker.value.slice(0, 7) + '&date=' + picker.value;
+    } else {
+      window.location.search = '?date=' + picker.value + (isExactMode ? '&mode=exact' : '');
+    }
+  });
+
+  // Mode links reuse the currently picked date/month; only the view changes.
+  // Labels describe what each link actually shows, not just the mode's name.
+  document.querySelectorAll('.today-mode-btn').forEach(function (a) {
+    var mode = a.dataset.mode;
+    if (mode === 'years') {
+      a.href = '?date=' + iso;
+      a.textContent = 'Every year, ' + pretty;
+    } else if (mode === 'exact') {
+      a.href = '?date=' + iso + '&mode=exact';
+      a.textContent = 'Just ' + prettyFull;
+    } else if (mode === 'month') {
+      a.href = '?month=' + ym + '&date=' + iso;
+      a.textContent = 'All of ' + monthLabel;
+    }
+
+    var isCurrent = (mode === 'years' && !isMonthMode && !isExactMode) ||
+                    (mode === 'exact' && isExactMode) ||
+                    (mode === 'month' && isMonthMode);
+    a.classList.toggle('active', isCurrent);
+    if (isCurrent) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
   });
 
   // ---- helpers ----
@@ -79,17 +147,46 @@
   function shiftDays(base, n) {
     return new Date(base.getFullYear(), base.getMonth(), base.getDate() + n);
   }
+  function shiftMonths(base, n) {
+    return new Date(base.getFullYear(), base.getMonth() + n, 1);
+  }
   function dateHref(x) {
-    return '?date=' + x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
+    var href = '?date=' + x.getFullYear() + '-' + pad(x.getMonth() + 1) + '-' + pad(x.getDate());
+    return isExactMode ? href + '&mode=exact' : href;
+  }
+  function monthHref(x) {
+    return '?month=' + x.getFullYear() + '-' + pad(x.getMonth() + 1);
   }
 
   var resultsEl = document.getElementById('today-results');
 
-  // Nothing on this date: say why, and give the reader somewhere to go.
+  // Nothing for this date/month: say why, and give the reader somewhere to go.
   function renderEmpty() {
     resultsEl.className = 'today-empty';
     resultsEl.innerHTML = '';
-    resultsEl.appendChild(el('p', 'today-empty-lead', 'No pages for ' + pretty + '.'));
+
+    if (isMonthMode) {
+      resultsEl.appendChild(el('p', 'today-empty-lead', 'No pages found for ' + monthLabel + '.'));
+      resultsEl.appendChild(el('p', 'today-empty-note',
+        'The papers did not publish every month — the earliest years are especially sparse. ' +
+        'Try a nearby month:'));
+
+      var mBase = new Date(Number(monthValue.slice(0, 4)), Number(monthValue.slice(5, 7)) - 1, 1);
+      var mPrev = shiftMonths(mBase, -1);
+      var mNext = shiftMonths(mBase, 1);
+      var mNav  = el('p', 'today-empty-nav');
+      var mBack = el('a', null, '← ' + mPrev.toLocaleDateString(undefined, { year: 'numeric', month: 'long' }));
+      mBack.href = monthHref(mPrev);
+      var mFwd = el('a', null, mNext.toLocaleDateString(undefined, { year: 'numeric', month: 'long' }) + ' →');
+      mFwd.href = monthHref(mNext);
+      mNav.appendChild(mBack);
+      mNav.appendChild(mFwd);
+      resultsEl.appendChild(mNav);
+      return;
+    }
+
+    var label = isExactMode ? prettyFull : pretty;
+    resultsEl.appendChild(el('p', 'today-empty-lead', 'No pages for ' + label + '.'));
     resultsEl.appendChild(el('p', 'today-empty-note',
       'The papers did not publish every day — summers, holidays, and the earliest ' +
       'years are sparse. Try a nearby date:'));
@@ -122,8 +219,7 @@
 
       // Thumbnails come from the islandora TN datastream, matching the search
       // page. The IIIF endpoint is rate-limited and this page can request a
-      // hundred-plus thumbnails at once. The pid keeps its literal colon here,
-      // exactly as the search page builds it.
+      // hundred-plus thumbnails at once.
       var img = document.createElement('img');
       img.loading = 'lazy';
       img.alt = '';
@@ -134,9 +230,9 @@
       thumb.appendChild(img);
 
       var cap = el('div', 'today-caption');
-      cap.appendChild(el('div', 'today-year', row.year));
+      cap.appendChild(el('div', 'today-year', row.date));
       if (row.paper_name) cap.appendChild(el('div', 'today-paper', row.paper_name));
-      cap.appendChild(el('div', 'today-date', row.date));
+      // cap.appendChild(el('div', 'today-date', row.date));
 
       a.appendChild(thumb);
       a.appendChild(cap);
@@ -144,17 +240,30 @@
     });
   }
 
-  fetch('/kansan/pages_on_this_day.json?_shape=objects&md=' + encodeURIComponent(md))
+  // month  -> pages_by_month:  one front page per day, bounded regardless of volume
+  // exact  -> pages_by_date:   every physical page of this one date (unchanged query)
+  // years  -> pages_on_this_day: this month-day, across every year (unchanged query)
+  var endpoint = isMonthMode
+    ? '/kansan/pages_by_month.json?_shape=objects&date_prefix=' + encodeURIComponent(monthValue)
+    : isExactMode
+      ? '/kansan/pages_by_date.json?_shape=objects&date_prefix=' + encodeURIComponent(iso)
+      : '/kansan/pages_on_this_day.json?_shape=objects&md=' + encodeURIComponent(md);
+
+  fetch(endpoint)
     .then(function (r) { return r.json(); })
     .then(function (data) {
       var rows = (data && data.rows) || [];
       if (!rows.length) { renderEmpty(); return; }
+      // pages_by_date orders ascending by pid, which is REVERSE physical page
+      // order (same convention viewer.html uses: highest pid = page 1). Only
+      // applies here, in exact mode — month mode's rows are one-per-day and
+      // are already in the chronological order we want to keep.
+      if (isExactMode) rows = rows.slice().reverse();
       renderCells(rows);
     })
     .catch(function () {
       resultsEl.className = 'today-status';
-      resultsEl.textContent =
-        'Could not load pages for ' + pretty + '. Refresh to try again.';
+      resultsEl.textContent = 'Could not load results. Refresh to try again.';
     });
 })();
 </script>
