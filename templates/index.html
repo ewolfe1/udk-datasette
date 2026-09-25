@@ -16,21 +16,21 @@
   <p class="lead">Full-text search across articles, ads, and OCR text, 1878–2017.</p>
 </div>
 
-  <form action="/kansan/search" method="get" class="search-form">
+  <form action="{{ urls.path('/kansan/search') }}" method="get" class="search-form">
     <input type="search" name="q" placeholder="Search the archive..." autofocus>
     <button type="submit">Search</button>
   </form>
 
 <div class="home-tiles">
-  <a class="home-tile" id="home-tile-today" href="/today">
+  <a class="home-tile" id="home-tile-today" href="{{ urls.path('/today') }}">
     <h2>Today in History</h2>
     <p>Pages from this date across 140 years of student publishing at KU.</p>
   </a>
-  <a class="home-tile" id="home-tile-map" href="/ads-map">
+  <a class="home-tile" id="home-tile-map" href="{{ urls.path('/ads-map') }}">
     <h2>Advertisers Map</h2>
     <p>Advertisers mapped by location across the collection.</p>
   </a>
-  <a class="home-tile" id="home-tile-data" href="/kansan">
+  <a class="home-tile" id="home-tile-data" href="{{ urls.path('/kansan') }}">
     <h2>View as Data</h2>
     <p>Explore the raw collection — tables, queries, and downloadable data.</p>
   </a>
@@ -40,7 +40,7 @@
 <div class="ai-notice-block">
   Metadata and OCR in this collection has been generated in part using AI
   (artificial intelligence) technologies and may
-  be incomplete, misleading, or inaccurate. <a href="/about#ai-disclosure">Learn more</a>
+  be incomplete, misleading, or inaccurate. <a href="{{ urls.path('/about') }}#ai-disclosure">Learn more</a>
 </div>
 
 <div class="stats">

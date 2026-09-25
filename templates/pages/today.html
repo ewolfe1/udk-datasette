@@ -18,7 +18,7 @@
     <label for="date-picker">Pick a date:</label>
     <input type="date" id="date-picker">
     <button type="submit" class="today-go-btn">Go</button>
-    <a href="/today" class="today-today-btn" id="today-btn">Jump to today</a>
+    <a href="{{ urls.path('/today') }}" class="today-today-btn" id="today-btn">Jump to today</a>
   </form>
 
   <div class="today-modes">
@@ -31,8 +31,8 @@
     <p class="today-status">
       This page assembles its results in the browser. With JavaScript turned off you can
       still reach the same data directly:
-      <a href="/kansan/pages_on_this_day">pages from a given day</a> or
-      <a href="/kansan/pages_by_date">pages by date</a>.
+      <a href="{{ urls.path('/kansan/pages_on_this_day') }}">pages from a given day</a> or
+      <a href="{{ urls.path('/kansan/pages_by_date') }}">pages by date</a>.
     </p>
   </noscript>
 
@@ -211,7 +211,7 @@
 
     rows.forEach(function (row) {
       var a = el('a', 'today-cell');
-      a.href   = '/static/viewer.html?pid=' + encodeURIComponent(row.pid);
+      a.href   = '{{ urls.path("/static/viewer.html") }}?pid=' + encodeURIComponent(row.pid);
       a.target = '_blank';
       a.rel    = 'noopener';
       a.setAttribute('aria-label',
@@ -244,10 +244,10 @@
   // exact  -> pages_by_date:   every physical page of this one date (unchanged query)
   // years  -> pages_on_this_day: this month-day, across every year (unchanged query)
   var endpoint = isMonthMode
-    ? '/kansan/pages_by_month.json?_shape=objects&date_prefix=' + encodeURIComponent(monthValue)
+    ? '{{ urls.path("/kansan/pages_by_month.json") }}?_shape=objects&date_prefix=' + encodeURIComponent(monthValue)
     : isExactMode
-      ? '/kansan/pages_by_date.json?_shape=objects&date_prefix=' + encodeURIComponent(iso)
-      : '/kansan/pages_on_this_day.json?_shape=objects&md=' + encodeURIComponent(md);
+      ? '{{ urls.path("/kansan/pages_by_date.json") }}?_shape=objects&date_prefix=' + encodeURIComponent(iso)
+      : '{{ urls.path("/kansan/pages_on_this_day.json") }}?_shape=objects&md=' + encodeURIComponent(md);
 
   fetch(endpoint)
     .then(function (r) { return r.json(); })

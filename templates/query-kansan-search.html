@@ -88,13 +88,13 @@
               <span class="result-actions">
                 <a class="result-action" target="_blank" rel="noopener"
                    title="Open these results in the dashboard"
-                   href="/-/dashboards/kansan_explore?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}">
+                   href="{{ urls.path('/-/dashboards/kansan_explore') }}?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 13 3-3 4 4 5-6"/></svg>
                   Visualize
                 </a>
                 <a class="result-action" download="kansan_search.csv"
                    title="Download these results as CSV"
-                   href="/kansan/search_export.csv?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&sort={{ sort|urlencode }}">
+                   href="search_export.csv?q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&category={{ category|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&sort={{ sort|urlencode }}">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
                   Export CSV
                 </a>
@@ -162,6 +162,7 @@
       {% set qs_not_category %}q={{ q|urlencode }}&year_from={{ year_from|urlencode }}&year_to={{ year_to|urlencode }}&source={{ source|urlencode }}&paper_name={{ paper_name|urlencode }}&subject={{ subject|urlencode }}&entity={{ entity|urlencode }}&sort={{ sort|urlencode }}{% endset %}
 
       <ul class="result-list view-list">
+        {% macro hl(t) %}{% if t %}{{ t|e|replace('&lt;mark&gt;', '<mark>'|safe)|replace('&lt;/mark&gt;', '</mark>'|safe) }}{% endif %}{% endmacro %}
         {% for row in rows %}
           {# Thumbnail URL: full-page TN for items; existing crop URL for ads/OCR. #}
           {% if row.source == 'item' %}
@@ -176,7 +177,7 @@
           {% endif %}
 
           {# Viewer destination — every card now opens in the viewer. #}
-          {% set viewer_url = '/static/viewer.html?pid=' ~ row.pid|urlencode ~ '&source=' ~ row.source ~ '&source_id=' ~ row.source_id %}
+          {% set viewer_url = urls.path('/static/viewer.html') ~ '?pid=' ~ row.pid|urlencode ~ '&source=' ~ row.source ~ '&source_id=' ~ row.source_id %}
           {% if row.iiif_url %}
             {% set bbox = row.iiif_url.split('~JP2/')[1].split('/')[0] %}
             {% set viewer_url = viewer_url ~ '&bbox=' ~ bbox %}
@@ -210,7 +211,7 @@
               </div>
               {% if row.source == 'ocr_element' %}
                 <p class="result-snippet">
-                  <a href="{{ viewer_url }}" target="_blank" rel="noopener">{{ row.match|safe }}</a>
+                  <a href="{{ viewer_url }}" target="_blank" rel="noopener">{{ hl(row.match) }}</a>
                 </p>
               {% else %}
                 <h3 class="result-title">
@@ -218,8 +219,7 @@
                     {{ row.title or '(untitled)' }}
                   </a>
                 </h3>
-                {% if row.match %}
-                  <p class="result-snippet">{{ row.match|safe }}</p>
+                  <p class="result-snippet">{{ hl(row.match) }}</p>
                 {% endif %}
               {% endif %}
             </div>
@@ -362,7 +362,7 @@
     ['q', 'year_from', 'year_to', 'source', 'paper_name', 'category', 'subject', 'entity']
       .forEach(function (k) { var v = params.get(k); if (v) p.set(k, v); });
 
-    fetch('/kansan/search_count.json?_shape=objects&' + p.toString())
+    fetch('search_count.json?_shape=objects&' + p.toString())
       .then(function (r) { return r.json(); })
       .then(function (data) {
         var total = data.rows[0].total;
@@ -467,10 +467,10 @@
 
   // Facet queries are expensive, so fetch a dimension only when its panel is
   // opened. Panels with an active filter render open, so those load immediately.
-  [['paper_name', '/kansan/search_facet_paper_name.json'],
-   ['category',   '/kansan/search_facet_category.json'],
-   ['subject',    '/kansan/search_facet_subject.json'],
-   ['entity',     '/kansan/search_facet_entity.json']
+  [['paper_name', 'search_facet_paper_name.json'],
+   ['category',   'search_facet_category.json'],
+   ['subject',    'search_facet_subject.json'],
+   ['entity',     'search_facet_entity.json']
   ].forEach(function (f) {
     var dim = f[0], endpoint = f[1];
     var group = document.getElementById('facet-' + dim + '-group');

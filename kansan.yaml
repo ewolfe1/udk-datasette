@@ -1305,6 +1305,7 @@ databases:
           FROM ads
           WHERE advertiser LIKE '%' || :name || '%'
           ORDER BY date
+          LIMIT 10000
         params: [name]
 
       coverage_by_decade:

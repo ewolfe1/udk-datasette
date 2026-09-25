@@ -21,7 +21,7 @@
 <div class="not-footer">
 
 {# ── Project header — replaces Datasette's native <header class="hd"> ── #}
-{# Primary destinations, ordered by how often people need them. #}
+{# Primary destination #}
 {% set site_nav_links = [
      ('/kansan/search',          'Search'),
      ('/kansan',                 'Data'),
@@ -29,10 +29,11 @@
      ('/about',                  'About')
    ] %}
 <div class="site-header">
-  <a class="site-title" href="/">KU Student Newspaper Archive</a>
+  <a class="site-title" href="{{ urls.instance() }}">KU Student Newspaper Archive</a>
   <nav class="site-nav" aria-label="Site navigation">
-    {% for href, label in site_nav_links %}
-    <a href="{{ href }}"{% if request and request.path == href %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% set current_path = (request.scope.route_path or request.path) if request else '' %}
+    {% for path, label in site_nav_links %}
+    <a href="{{ urls.path(path) }}"{% if current_path == path %} aria-current="page"{% endif %}>{{ label }}</a>
     {% endfor %}
   </nav>
 </div>
@@ -87,7 +88,7 @@
   {% block ai_notice %}
   <div class="ai-notice" role="note">
     Metadata and OCR in this collection were generated in part using AI and may be incomplete or inaccurate.
-    <a href="/about#ai-disclosure">Learn more</a>
+    <a href="{{ urls.path('/about') }}#ai-disclosure">Learn more</a>
   </div>
   {% endblock %}
   {% block footer %}{% include "_footer.html" %}{% endblock %}

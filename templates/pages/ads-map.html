@@ -194,7 +194,7 @@
         This map is provided as an overview and introductory search — it is not a substitute for the
         actual printed data. Inaccurate, imprecise, or missing points may have been introduced through
         AI address-detection errors, or because automated georeferencing returned no valid result.</p>
-      <a href="/about#ai-disclosure" target="_blank" rel="noopener">Learn more about how AI was used in this process</a>
+      <a href="{{ urls.path('/about') }}#ai-disclosure" target="_blank" rel="noopener">Learn more about how AI was used in this process</a>
     </div>
   </details>
 </div>
@@ -245,7 +245,7 @@
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.3/leaflet-maplibre-gl.js"></script>
 <script>
 /* ── CONFIG: "view all in the archive" link target (your ads table/query page) ── */
-const ARCHIVE_BASE = "/kansan/ads";          // <-- adjust to your ads table/query path
+const ARCHIVE_BASE = "{{ urls.path('/kansan/ads') }}";
 function archiveUrl(ad){
   const term = ad.advertiser || ad.matched_address || "";
   return ARCHIVE_BASE + "?_search=" + encodeURIComponent(term);
@@ -332,7 +332,7 @@ function filterParams(){
 // Category → [subcategories], built once from ads_geo_dims.
 const SUBCATS = new Map();
 function loadDims(){
-  fetch("/kansan/ads_geo_dims.json?_shape=array&_size=max")
+  fetch("{{ urls.path('/kansan/ads_geo_dims.json') }}?_shape=array&_size=max")
     .then(r=>r.json())
     .then(rows=>{
       rows.forEach(({category, subcategory})=>{
@@ -371,7 +371,7 @@ function locationTooltip(r){
 }
 
 function loadLocations(){
-  fetch("/kansan/ads_geo_locations.json?_shape=array&_size=max&" + filterParams())
+  fetch("{{ urls.path('/kansan/ads_geo_locations.json') }}?_shape=array&_size=max&" + filterParams())
     .then(r=>r.json())
     .then(rows=>{
       cluster.clearLayers();
@@ -403,7 +403,7 @@ function bboxFromIiif(url){
   try { return url.split("~JP2/")[1].split("/")[0]; } catch(e){ return ""; }
 }
 function viewerUrl(ad){
-  let u = "/static/viewer.html?pid=" + encodeURIComponent(ad.pid) +
+  let u = "{{ urls.path('/static/viewer.html') }}?pid=" + encodeURIComponent(ad.pid) +
           "&source=ad&source_id=" + encodeURIComponent(ad.id);
   const bbox = ad.iiif_url ? bboxFromIiif(ad.iiif_url) : "";
   if(bbox) u += "&bbox=" + encodeURIComponent(bbox);
@@ -448,7 +448,7 @@ function openPanel(loc){
   els.panel.classList.add("open");
   const p = filterParams();
   p.set("lat", loc.lat); p.set("lon", loc.lon);
-  fetch("/kansan/ads_at_location.json?_shape=array&_size=max&" + p)
+  fetch("{{ urls.path('/kansan/ads_at_location.json') }}?_shape=array&_size=max&" + p)
     .then(r=>r.json())
     .then(ads=>renderPanel(loc, ads))
     .catch(()=>{ els.panelBody.innerHTML = `<div class="admap-empty">Could not load ads.</div>`; });

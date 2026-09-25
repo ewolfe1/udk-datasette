@@ -4,7 +4,7 @@
   <title>Page viewer — KU Student Newspaper Archive</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="/static/custom.css">
+  <link rel="stylesheet" href="custom.css">
   <style>
     * { box-sizing: border-box; }
     body {
@@ -814,6 +814,7 @@
 
   <script>
   (function () {
+    var BASE = location.pathname.replace(/static\/viewer\.html$/, '');
     var params = new URLSearchParams(location.search);
     var pid           = params.get('pid');
     var arrivalBbox   = params.get('bbox') || '';
@@ -826,7 +827,7 @@
       errorEl.style.display = 'block';
       document.getElementById('layout').style.display = 'none';
     }
-    if (!pid) { fail('Missing pid parameter.'); return; }
+    if (!pid || !/^ku-udk:\d+$/.test(pid)) { fail('Missing or invalid pid parameter.'); return; }
 
     // ---- DOM refs ----
     var img         = document.getElementById('page-img');
@@ -1156,10 +1157,10 @@
     // named_entity_search: name + entity_type).
     function tagHref(kind, term) {
       if (kind === 'subject') {
-        return '/kansan/subject_search?subject=' + encodeURIComponent(term);
+        return BASE + 'kansan/subject_search?subject=' + encodeURIComponent(term);
       }
       if (kind === 'entity') {
-        return '/kansan/named_entity_search?entity_type=&name=' +
+        return BASE + 'kansan/named_entity_search?entity_type=&name=' +
                encodeURIComponent(term);
       }
       return null;
@@ -1247,7 +1248,7 @@
       btn.addEventListener('click', function () {
         btn.disabled = true;
         btn.textContent = 'Sending\u2026';
-        fetch('/-/flag-ocr', {
+        fetch(BASE + '-/flag-ocr', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ocr_id: item.id })
@@ -1408,7 +1409,7 @@
                  fullPageUrl + ' (Accessed ' + todayLong() + ').';
 
       document.getElementById('cite-text').innerHTML =
-        titleHtml + '<em>' + esc(paper) + '</em>, ' + esc(dateStr) + tail;
+        titleHtml + '<em>' + esc(paper) + '</em>, ' + esc(dateStr) + esc(tail);
       document.getElementById('cite-text').dataset.plain =
         titlePlain + paper + ', ' + dateStr + tail;
 
@@ -1644,7 +1645,7 @@
     function jSafe(url) { return j(url).catch(function () { return { rows: [] }; }); }
     var P = encodeURIComponent(pid);
 
-    jSafe('/kansan/pages/' + pid + '.json?_shape=objects')
+    jSafe(BASE + 'kansan/pages/' + pid + '.json?_shape=objects')
       .then(function (d) {
         var page = (d.rows && d.rows[0]) || {};
         var lbl = [page.paper_name, page.volume ? 'Vol. ' + page.volume : '',
@@ -1660,10 +1661,10 @@
         updateCitation();           // page-level citation until something is selected
 
         return Promise.all([
-          jSafe('/kansan/items_for_page.json?_shape=objects&pid=' + P),
-          jSafe('/kansan/ads_for_page.json?_shape=objects&pid=' + P),
-          jSafe('/kansan/ocr_for_page.json?_shape=objects&pid=' + P),
-          date ? jSafe('/kansan/pages_by_date.json?_shape=objects&date_prefix=' + encodeURIComponent(date))
+          jSafe(BASE + 'kansan/items_for_page.json?_shape=objects&pid=' + P),
+          jSafe(BASE + 'kansan/ads_for_page.json?_shape=objects&pid=' + P),
+          jSafe(BASE + 'kansan/ocr_for_page.json?_shape=objects&pid=' + P),
+          date ? jSafe(BASE + 'kansan/pages_by_date.json?_shape=objects&date_prefix=' + encodeURIComponent(date))
                : Promise.resolve({ rows: [] })
         ]);
       })

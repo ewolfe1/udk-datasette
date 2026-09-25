@@ -9,20 +9,20 @@
 {% block content %}
 <div class="about-content">
 
+<h1>About This Archive</h1>
+
   <div class="about-ai">
   <h3>A note on using the descriptions</h3>
 
   <p><em>Descriptive metadata, OCR text, object detection, and map placement for items in this collection has been generated in part using AI (artificial intelligence) technologies and may be incomplete, misleading, or inaccurate. Any metadata listed on this site or found in the data is not to be considered as ground truth and should always be verified against the original page.</em></p>
 </div>
 
-<h1>About This Archive</h1>
-
   <p>The KU Student Newspaper Archive provides full text search and browse access to the student
   newspapers published at the University of Kansas from 1878 to 2017 — about 190,000
   pages and two million individual items, including articles, advertisements, and the
   full text of every page.</p>
 
-  <p>The newspapers themselves are held by KU Libraries and can be explored chronologically as full page images in KU's Digital Collections at <a href="https://digital.lib.ku.edu/ku-udk/root" target="_blank">https://digital.lib.ku.edu/ku-udk/root</a>.
+  <p>The newspapers themselves are held by KU Libraries and can be explored chronologically as full page images in KU's Digital Collections at <a href="https://digital.lib.ku.edu/ku-udk/root" target="_blank" rel="noopener">https://digital.lib.ku.edu/ku-udk/root</a>.
   This archive presents highly detailed access to that collection. Rather than presenting the papers page by page, it divides them into individual, searchable items, making it possible to find and compare material across the full 140-year run.</p>
 
   <h2>The Newspapers</h2>
@@ -32,7 +32,7 @@
 
   <table class="about-table">
     <thead>
-      <tr><th>Title</th><th>Years</th></tr>
+      <tr><th scope="col">Title</th><th scope="col">Years</th></tr>
     </thead>
     <tbody>
       <tr><td>The University Courier</td><td>1878–1895</td></tr>
@@ -47,7 +47,7 @@
   </table>
 
   <h3>Image source and known issues</h3>
-  <p>These images have been digitized from the original microfilm reels, imaged at the Kansas State Historical Society beginning in the 1970s. As a result, there may be issues with image quality, duplicate or missing pages, legibility, or other concerns. Coverage depends on the contents of the microfilm, so some issues and pages are missing. In some instances, smaller pages were photographed on top of larger pages, resulting in considerable overlap of visible text and duplicated or inaccurate metadata for a given page.
+  <p>These images have been digitized from the original microfilm reels, imaged at the Kansas State Historical Society beginning in the 1970s. As a result, there may be issues with image quality, duplicate or missing pages, legibility, or other concerns. Coverage depends on the contents of the microfilm, so some issues and pages are missing. In some instances, smaller pages were photographed on top of larger pages, resulting in considerable overlap of visible text and duplicated or inaccurate metadata for a given page.</p>
 
   <h2 id="ai-disclosure">AI and Automated Processing</h2>
 
@@ -57,7 +57,7 @@
 
   <table class="about-table">
     <thead>
-      <tr><th>Content</th><th>Process</th><th>Tool</th></tr>
+      <tr><th scope="col">Content</th><th scope="col">Process</th><th scope="col">Tool</th></tr>
     </thead>
     <tbody>
       <tr>
@@ -108,12 +108,12 @@
 
   <h3>Advertisements</h3>
 
-  <p>Advertisements were identifed through the use of LayoutParser, a neural network trained on the Library of Congress' Newspaper Navigator model. This tool identifed the bounding box for each detected ad, which was subsequently analyzed by GLM-4.5V to generate metadata such as a category, keywords, advertiser's name, an address, and other details. Because ads have actual
+  <p>Advertisements were identified through the use of LayoutParser, a neural network trained on the Library of Congress' Newspaper Navigator model. This tool identified the bounding box for each detected ad, which was subsequently analyzed by GLM-4.5V to generate metadata such as a category, keywords, advertiser's name, an address, and other details. Because ads have actual
   bounding boxes, their highlighted regions are generally more accurate than those for
-  articles. LayoutParser's detection is imperfect - some ads are missed, particularly early ads set as plain text; adjacent ads are sometimes merged into one; or the box may drawn too large or too small.</p>
+  articles. LayoutParser's detection is imperfect - some ads are missed, particularly early ads set as plain text; adjacent ads are sometimes merged into one; or the box may be drawn too large or too small.</p>
 
   <p>Addresses detected through this process were cleaned and normalized, then geocoded
-  with OpenStreetMap via Nominatim (with ArcGIS used as a backup search in some cases) to identify latitute and longitude coordinates. Due to a variety of complex issues with OCR detection, partial or imprecise addresses, and a variety of other factors, mapped locations may have errors.</p>
+  with OpenStreetMap via Nominatim (with ArcGIS used as a backup search in some cases) to identify latitude and longitude coordinates. Due to a variety of complex issues with OCR detection, partial or imprecise addresses, and a variety of other factors, mapped locations may have errors.</p>
 
   <h3>Page text (OCR)</h3>
 
