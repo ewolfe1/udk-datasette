@@ -610,10 +610,11 @@ plugins:
                 [[ AND category = :category ]]
                 [[ AND ('|' || subjects || '|' LIKE '%|' || :subject || '|%'
                      OR '|' || keywords || '|' LIKE '%|' || :subject || '|%') ]]
+
               LIMIT 10000
             ),
             vals AS (
-              SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities <> ''
+              SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities <> '' AND named_entities <> 'nan'
               UNION ALL
               SELECT rk, advertiser           FROM matched WHERE advertiser     IS NOT NULL AND advertiser     <> ''
             ),
@@ -1050,7 +1051,7 @@ databases:
             LIMIT 10000
           ),
           vals AS (
-            SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities != ''
+            SELECT rk, named_entities AS v FROM matched WHERE named_entities IS NOT NULL AND named_entities != '' AND named_entities != 'nan'
             UNION ALL
             SELECT rk, advertiser           FROM matched WHERE advertiser     IS NOT NULL AND advertiser     != ''
           ),
