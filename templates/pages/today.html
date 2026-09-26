@@ -254,11 +254,17 @@
     .then(function (data) {
       var rows = (data && data.rows) || [];
       if (!rows.length) { renderEmpty(); return; }
-      // pages_by_date orders ascending by pid, which is REVERSE physical page
-      // order (same convention viewer.html uses: highest pid = page 1). Only
-      // applies here, in exact mode — month mode's rows are one-per-day and
-      // are already in the chronological order we want to keep.
-      if (isExactMode) rows = rows.slice().reverse();
+      // pages_by_date orders ascending by pid. For pids > 4000, ascending pid
+      // is REVERSE physical page order (same convention viewer.html uses:
+      // highest pid = page 1); for pids <= 4000, ascending pid already IS
+      // physical page order. Only applies here, in exact mode — month mode's
+      // rows are one-per-day and are already in the chronological order we
+      // want to keep. A date's pages never straddle the 4000 boundary, so
+      // checking the first row's pid is enough to decide for the whole page.
+      if (isExactMode && rows.length) {
+        var firstPidNum = parseInt(String(rows[0].pid).split(':').pop(), 10);
+        if (firstPidNum > 4000) rows = rows.slice().reverse();
+      }
       renderCells(rows);
     })
     .catch(function () {

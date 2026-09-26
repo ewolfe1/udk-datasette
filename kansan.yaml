@@ -1119,23 +1119,28 @@ databases:
         params: [q, year_from, year_to, source, paper_name, category, subject, entity, sort]
 
       # Pick the highest-PID page per year for a given MM-DD. In this collection
-      # the highest pid for a given date is reliably page 1 (95% of issues were
-      # bulk-ingested in that order).
+      # the highest pid for a given date is usually page 1, except when pid < 4000
       pages_on_this_day:
         title: Pages from this day across all years
         description: "md: month-day in MM-DD format (e.g. 05-29)"
         hide_sql: true
         sql: |
-          WITH ranked AS (
+          WITH nums AS (
             SELECT pid, date, year, paper_name,
-                   ROW_NUMBER() OVER (PARTITION BY date ORDER BY pid DESC) AS rn
+                   CAST(substr(pid, instr(pid, ':') + 1) AS INTEGER) AS pid_num
             FROM pages
             WHERE substr(date, 6) = :md
+          ),
+          bounds AS (
+            SELECT date, MIN(pid_num) AS min_pid_num, MAX(pid_num) AS max_pid_num
+            FROM nums
+            GROUP BY date
           )
-          SELECT pid, date, year, paper_name
-          FROM ranked
-          WHERE rn = 1
-          ORDER BY year ASC
+          SELECT n.pid, n.date, n.year, n.paper_name
+          FROM nums n
+          JOIN bounds b ON b.date = n.date
+          WHERE n.pid_num = CASE WHEN b.max_pid_num > 4000 THEN b.max_pid_num ELSE b.min_pid_num END
+          ORDER BY n.year ASC
         params: [md]
 
       pages_by_date:
@@ -1153,14 +1158,25 @@ databases:
         title: Browse front pages by month
         description: >-
           date_prefix: a year-month (1995-02). Returns one row per day in that
-          month — the front (highest-pid) page of that day's issue — so results
-          stay bounded regardless of how often the paper ran that month.
+          month — the front page of that day's issue — so results stay bounded
+          regardless of how often the paper ran that month.
         sql: |
-          SELECT pid, date, year, paper_name, volume, number, page_url, MAX(pid) AS max_pid
-          FROM pages
-          WHERE date LIKE :date_prefix || '%'
-          GROUP BY date
-          ORDER BY date
+          WITH nums AS (
+            SELECT pid, date, year, paper_name, volume, number, page_url,
+                   CAST(substr(pid, instr(pid, ':') + 1) AS INTEGER) AS pid_num
+            FROM pages
+            WHERE date LIKE :date_prefix || '%'
+          ),
+          bounds AS (
+            SELECT date, MIN(pid_num) AS min_pid_num, MAX(pid_num) AS max_pid_num
+            FROM nums
+            GROUP BY date
+          )
+          SELECT n.pid, n.date, n.year, n.paper_name, n.volume, n.number, n.page_url
+          FROM nums n
+          JOIN bounds b ON b.date = n.date
+          WHERE n.pid_num = CASE WHEN b.max_pid_num > 4000 THEN b.max_pid_num ELSE b.min_pid_num END
+          ORDER BY n.date
           LIMIT 100
         params: [date_prefix]
 

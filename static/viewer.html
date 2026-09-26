@@ -1152,6 +1152,16 @@
       var d = document.createElement('div'); d.textContent = (s == null ? '' : s);
       return d.innerHTML;
     }
+    // pages_by_date orders ascending by pid. For pids > 4000, ascending pid is
+    // REVERSE physical page order (highest pid = page 1); for pids <= 4000,
+    // ascending pid already IS physical page order. A date's pages never
+    // straddle the 4000 boundary, so checking the first pid decides the whole
+    // list.
+    function orderPages(list) {
+      if (!list.length) return list.slice();
+      var firstPidNum = parseInt(String(list[0].pid).split(':').pop(), 10);
+      return firstPidNum > 4000 ? list.slice().reverse() : list.slice();
+    }
     // Each tag links to the canned query built for that dimension. Param names
     // are the ones those queries declare (subject_search: subject;
     // named_entity_search: name + entity_type).
@@ -1552,7 +1562,7 @@
     function renderPages(pages) {
       pageListEl.innerHTML = '';
       pageListEl.appendChild(el('div', 'vi-list-caption', 'Pages from this date'));
-      pages.slice().reverse().forEach(function (pg, idx) {
+      orderPages(pages).forEach(function (pg, idx) {
         var isCurrent = (pg.pid === pid);
         var label = 'Page ' + (idx + 1) + ' of ' + pages.length;
         var row;
@@ -1608,7 +1618,7 @@
 
       if (hasPages) {
         renderPages(pages);
-        renderPageNav(pages.slice().reverse());
+        renderPageNav(orderPages(pages));
       }
 
       if (!items.length) {
