@@ -93,7 +93,7 @@ plugins:
         m-items:
           title: Articles & Items
           db: kansan
-          query: SELECT printf('%.1fM', SUM(item_count) / 1e6) as n FROM stats_by_year
+          query: SELECT printf('%.2fM', SUM(item_count) / 1e6) as n FROM stats_by_year
           library: metric
           display:
             field: n

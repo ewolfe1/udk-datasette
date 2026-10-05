@@ -49,27 +49,52 @@
   <div class="search-layout">
     <div class="search-main">
       {% if not q %}
-      <div class="search-intro">
-        <p class="search-intro-lead">
-          Search articles, advertisements, and OCR page text across 140 years
-          of student journalism at KU, 1878–2017.
-        </p>
-        <p class="search-intro-eg">Try:
-          <a href="?q=rock+chalk">rock chalk</a>
-          <a href="?q=Wilt+Chamberlain">Wilt Chamberlain</a>
-          <a href="?q=Vietnam">Vietnam</a>
-          <a href="?q=homecoming">homecoming</a>
-        </p>
-      </div>
-      {% endif %}
+        {% set all_examples = [
+          'rock chalk', 'Wilt Chamberlain', 'Vietnam', 'homecoming',
+          'Watergate', 'basketball', 'Carrie Watson', 'Title IX',
+          'Jayhawk', '"museum of art"', 'KJHK', 'symposium', 'marching band',
+          'mechanical engineering'
+        ] %}
+        {% set ns = namespace(pool=all_examples, picks=[]) %}
+        {% for i in range(4) %}
+          {% set pick = ns.pool|random %}
+          {% set ns.picks = ns.picks + [pick] %}
+          {% set ns.pool = ns.pool|reject('equalto', pick)|list %}
+        {% endfor %}
+        <div class="search-intro">
+          <p class="search-intro-lead">
+            Search articles, advertisements, and OCR page text across 140 years
+            of student journalism at KU, 1878–2017.
+          </p>
+          <p class="search-intro-eg">Try:
+            {% for term in ns.picks %}
+            <a href="?q={{ term|urlencode }}">{{ term }}</a>
+            {% endfor %}
+          </p>
+          
+          <div class='null-search-tips'>
+            <p><strong>Search tips</strong></p>
+              <ul>
+                <li>Quote phrases for exact matches: <code>"world war"</code></li>
+                <li>Words separated by spaces all must appear: <code>kansas football</code></li>
+                <li>Use <code>OR</code> for alternatives: <code>kansas OR jayhawks</code></li>
+                <li>Use <code>NOT</code> to exclude: <code>football NOT basketball</code></li>
+                <li>Find words near each other: <code>NEAR(rock chalk, 10)</code></li>
+                <li>Prefix match with <code>*</code>: <code>jayhawk*</code> (matches <em>jayhawks</em>, <em>jayhawker</em>)</li>
+              </ul>
+          </div>
+        </div>
+        {% endif %}
       {% if q %}
         <div class="results-header">
           <span class="result-count" id="result-count"
                 data-offset="{{ offset }}" data-shown="{{ rows|length }}">
             {% if rows %}
-              Showing {{ offset + 1 }}–{{ offset + rows|length }}{% if has_more %}, more available{% endif %}
-            {% else %}
-              No results for <strong>{{ q }}</strong>
+                Showing {{ offset + 1 }}–{{ offset + rows|length }}{% if has_more %}, more available{% endif %}
+              {% elif error %}
+                Search syntax error — check your quotes, parentheses, and operators
+              {% else %}
+                No results for <strong>{{ q }}</strong>
             {% endif %}
           </span>
 
@@ -129,7 +154,11 @@
           {%- endfor %}
         </div>
 
-        {% if not rows %}
+        {% if error %}
+          <div class="no-results">
+            <p class="no-results-lead">Couldn't run that search — check the search syntax and try again.</p>
+          </div>
+        {% elif not rows %}
           {# Empty state: every suggestion is a link that actually runs a
              broader search, rather than advice the reader has to act on. #}
           <div class="no-results">

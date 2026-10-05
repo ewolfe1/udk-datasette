@@ -1128,6 +1128,17 @@ details.facet-group[open] > summary::after { transform: rotate(180deg); }
    tip is a live link that runs a broader search.
    ============================================================ */
 
+
+ .null-search-tips {
+   margin-top: 1rem;
+   padding: 1.5rem 2rem;
+   border: 1px solid #ccc;
+   border-radius: 20px;
+ }
+ .null-search-tips ul {
+   list-style-type: '- ';
+ }
+
 .no-results {
     margin: 1.5rem 0 2rem;
     padding: 1.25rem 1.5rem;
