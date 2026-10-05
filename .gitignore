@@ -16,3 +16,4 @@ log-and-notes.md
 run_datasette.py
 kansan*.md
 *_bak*
+counts.json
