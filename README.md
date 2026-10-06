@@ -1,3 +1,4 @@
+**Active repo moved to `ku-applications` 2026-10-06. Retaining this repo temporarily for reference.**
 
 # Running Datasette instance for KU student newspaper project
 
